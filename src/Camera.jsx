@@ -10,7 +10,9 @@ const Camera = () => {
         .then((stream) => {
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
-            videoRef.current.play();
+            videoRef.current.play().catch(() => {
+              // play interrupted by new load request, ignore
+            });
           }
         })
         .catch((err) => {
@@ -23,6 +25,7 @@ const Camera = () => {
     <div style={{ width: '100%', height: '100%' }}>
       <video
         ref={videoRef}
+        autoPlay
         style={{
           width: '100%',
           height: '100%',

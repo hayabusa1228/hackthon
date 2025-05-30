@@ -30,6 +30,8 @@ const AvatarViewer = ({ vrmUrl }) => {
 
     // レンダラーを作成
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    // enable transparent background
+    renderer.setClearColor(0x000000, 0);
     renderer.setSize(width, height);
     renderer.setPixelRatio(window.devicePixelRatio);
     rendererRef.current = renderer;
@@ -51,17 +53,19 @@ const AvatarViewer = ({ vrmUrl }) => {
       return new VRMLoaderPlugin(parser);
     });
 
+    // load VRM from public folder
+    const url = vrmUrl.startsWith('/') ? vrmUrl : `/${vrmUrl}`;
     loader.load(
-      vrmUrl,
+      url,
       (gltf) => {
-        // gltf.userData.vrm に VRM オブジェクトが入っている
         const vrm = gltf.userData.vrm;
         vrmRef.current = vrm;
 
-        // VRM の初期スケールを調整（必要に応じて変更してください）
-        vrm.scene.scale.set(1.0, 1.0, 1.0);
+        // VRM の初期スケールを調整
+        vrm.scene.scale.set(1.5, 1.5, 1.5);
+        // VRM の位置を調整して中央に配置
+        vrm.scene.position.set(0, -1, 0);
 
-        // VRM をシーンに追加
         scene.add(vrm.scene);
 
         console.log('✔ VRM model loaded:', vrm);
@@ -77,16 +81,7 @@ const AvatarViewer = ({ vrmUrl }) => {
 
     // 4) アニメーションループを開始
     const animate = () => {
-      // VRM がロードされていれば、頭（Head）の方向を少し揺らすなども可能
-      if (vrmRef.current) {
-        // VRM の root がシーンに含まれているかチェック
-        // ここでは単純にゆらゆらと少しだけ腕を動かしてみる例：
-        const now = Date.now() / 1000;
-        vrmRef.current.humanoid.getNormalizedBoneNode(
-          VRM.HumanoidBoneName.RightUpperArm
-        ).rotation.z = Math.sin(now) * 0.2;
-      }
-
+      // レンダリング
       renderer.render(scene, camera);
       requestIdRef.current = requestAnimationFrame(animate);
     };
