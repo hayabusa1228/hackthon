@@ -6,110 +6,132 @@ html, body, #root {
   height: 100%;
 }
 
-/* ── AppContainer: ヘッダー + メイン領域を縦に並べる ── */
+/* ── 「ヘッダー＋メイン領域」を縦に並べる親コンテナ ── */
 .AppContainer {
   display: flex;
   flex-direction: column;
-  height: 100vh;       /* ビューポート全体の高さを使う */
-  overflow: hidden;    /* はみ出し禁止 */
+  height: 100vh;      /* ビューポート全体を使う */
+  overflow: hidden;   /* 子要素のはみ出しを禁止 */
 }
 
 /* ── ヘッダー部分 ── */
 .header {
   display: flex;
-  align-items: center;        /* 垂直中央揃え */
-  padding: 0.75rem 1rem;      /* 上下 0.75rem、左右 1rem の余白を確保 */
+  align-items: center;        /* 垂直中央 */
+  padding: 0.75rem 1rem;      /* 上下 0.75rem、左右 1rem */
   background-color: #2c2c2c;
   border-bottom: 1px solid #444;
 
-  /* min-height で「これ以下には縮まない」を担保 */
-  min-height: 60px;           /* どれだけ画面を小さくしても高さ60px以下にはならない */
-  /* 高さは中身（パディング＋文字サイズ）で決まる。固定 height は指定しない */
+  min-height: 60px;           /* どれだけ詰まっても 60px 以下にはならない */
   box-sizing: border-box;
 }
 
 .headerTitle {
   color: #fff;
-  font-size: 1.5rem;          /* ルートフォントサイズに依存 */
-  margin: 0;                  /* デフォルトマージンをリセット */
-  white-space: nowrap;        /* 折り返さない */
+  font-size: 1.5rem;          /* フォントサイズ */
+  margin: 0;
+  white-space: nowrap;        /* 改行禁止 */
 }
 
-/* ── ヘッダー下のメイン領域 ── */
+/* ── ヘッダー下の左右パネルを配置する領域 ── */
 .App {
   display: flex;
-  flex: 1;                    /* ヘッダーを除いた残りの領域をすべて占有 */
+  flex: 1;                    /* ヘッダーを除いた残り空間をすべて占有 */
   background-color: #1a1a1a;
   color: #fff;
-  overflow: hidden;           /* 横縦のはみ出しを禁止 */
+  overflow: hidden;           /* はみ出し禁止 */
 }
 
-/* ── パネル共通スタイル ── */
+/* ── 各パネル共通設定 ── */
 .panel {
-  flex: 1;                    /* ユーザーパネルとトレーナーパネルを左右で均等に分割 */
+  flex: 1;                    /* 左右均等に幅を分割 */
   display: flex;
   flex-direction: column;
   overflow: hidden;           /* 子要素のはみ出し禁止 */
 }
 
-/* ── 左パネルのみ罫線 ── */
 .userPanel {
   border-right: 1px solid #444;
 }
 
-/* ── パネル上部のタイトル部分 ── */
+.trainerPanel {
+  /* 右パネルに特別な罫線はなし */
+}
+
+/* ── パネル上部タイトル ── */
 .panelTitle {
   background-color: #2c2c2c;
   padding: 0.5rem 1rem;       /* 上下 0.5rem、左右 1rem */
   font-size: 1.25rem;
   text-align: left;
   border-bottom: 1px solid #444;
-  margin: 0;                  /* h2 タグのデフォルトマージンをリセット */
+  margin: 0;                  /* デフォルトマージンをリセット */
   box-sizing: border-box;
-  flex-shrink: 0;             /* これ以上は縮まない */
+  flex-shrink: 0;             /* これ以上縮まない */
 }
 
-/* ── 映像・画像を表示する領域 ── */
+/* ── ビデオ・画像を表示する領域 ── */
 .panelContent {
-  flex: 1;                    /* パネルの残り全体を占有 */
+  flex: 1;                    /* パネル内部の残り空間を占有 */
+  display: flex;
+  justify-content: center;    /* 映像・画像を中央に置く */
+  align-items: center;
+  padding: 0;                 /* 余白ゼロ */
+  background-color: #000;
+  position: relative;
+  overflow: hidden;           /* はみ出しは禁止 */
+}
+
+/* --------------------------------------------------- */
+/* ● ここが肝：video 要素を切り取りなしで全体表示する ▼ */
+/* --------------------------------------------------- */
+.videoWrapper {
+  /* panelContent の中でさらに子要素をセンタリングするだけ */
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 0;                 /* 余白なし */
-  background-color: #000;
-  position: relative;
-  overflow: hidden;           /* 映像や画像がはみ出しても隠す */
-}
-
-.panelContent video,
-.panelContent img {
   width: 100%;
   height: 100%;
-  object-fit: cover;          /* 親要素いっぱいに広げつつ中央トリミング */
-  border-radius: 0;           /* 角丸をなくす */
 }
 
-/* ── トレーナーパネル下部のセリフ表示欄 ── */
+.responsiveVideo {
+  max-width: 100%;      /* 容器の幅を超えない */
+  max-height: 100%;     /* 容器の高さを超えない */
+  object-fit: contain;  /* 切り取りなしでアスペクト比を保持しながら全体を表示 */
+  /* 幅・高さを 100% にせず max- を使うことで、縦横のどちらにもはみ出さないようにする */
+}
+
+/* --------------------------------------------------- */
+/* ● 同じくトレーナー画像も切り取りなしで全体表示する ▼ */
+/* --------------------------------------------------- */
+.responsiveImage {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* ── トレーナーパネル下のセリフ表示欄 ── */
 .trainerPanel .subtitle {
-  padding: 0.5rem 1rem;       /* 上下 0.5rem、左右 1rem */
+  padding: 0.5rem 1rem;
   background-color: rgba(0, 0, 0, 0.6);
   color: #fff;
   font-size: 1rem;
   text-align: center;
   border-top: 1px solid #444;
-  margin: 0;                  /* デフォルトマージンをリセット */
-  flex-shrink: 0;             /* これ以上は縮まない */
+  margin: 0;
+  box-sizing: border-box;
+  flex-shrink: 0;         /* これ以上は縮まない */
   word-wrap: break-word;
 }
 
-/* ── メディアクエリ：小さい画面向けに微調整 ── */
+/* ── メディアクエリ：小さな画面で文字やパディングを微調整 ── */
 @media (max-width: 768px) {
   .header {
-    padding: 0.5rem 0.75rem;  /* パディングを若干小さく */
-    min-height: 50px;         /* ヘッダーの最小高さも若干下げる */
+    padding: 0.5rem 0.75rem;
+    min-height: 50px;
   }
   .headerTitle {
-    font-size: 1.25rem;       /* タイトル文字を少し縮小 */
+    font-size: 1.25rem;
   }
   .panelTitle {
     font-size: 1.125rem;
