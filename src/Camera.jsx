@@ -1,8 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 const Camera = () => {
   const videoRef = useRef(null);
-  const canvasRef = useRef(null);
 
   useEffect(() => {
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -21,9 +20,17 @@ const Camera = () => {
   }, []);
 
   return (
-    <div style={{ textAlign: 'center' }}>
-      <video ref={videoRef} style={{ width: '100%', maxWidth: '600px' }} />
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
+    <div style={{ width: '100%', height: '100%' }}>
+      <video
+        ref={videoRef}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+        }}
+        muted
+        playsInline
+      />
     </div>
   );
 };

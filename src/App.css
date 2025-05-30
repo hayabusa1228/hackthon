@@ -1,96 +1,140 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0 2rem;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
-}
-
-/* Zoom-like layout styles */
-.App {
-  display: flex;
-  height: 100vh;
+/* ── 画面全体を使うためのリセット ── */
+html, body, #root {
   margin: 0;
-  background-color: #1a1a1a;
-  color: #fff;
+  padding: 0;
+  width: 100%;
+  height: 100%;
 }
 
-.panel {
-  flex: 1;
+/* ── AppContainer: ヘッダー + メイン領域を縦に並べる ── */
+.AppContainer {
   display: flex;
   flex-direction: column;
+  height: 100vh;       /* ビューポート全体の高さを使う */
+  overflow: hidden;    /* はみ出し禁止 */
 }
 
+/* ── ヘッダー部分 ── */
+.header {
+  display: flex;
+  align-items: center;        /* 垂直中央揃え */
+  padding: 0.75rem 1rem;      /* 上下 0.75rem、左右 1rem の余白を確保 */
+  background-color: #2c2c2c;
+  border-bottom: 1px solid #444;
+
+  /* min-height で「これ以下には縮まない」を担保 */
+  min-height: 60px;           /* どれだけ画面を小さくしても高さ60px以下にはならない */
+  /* 高さは中身（パディング＋文字サイズ）で決まる。固定 height は指定しない */
+  box-sizing: border-box;
+}
+
+.headerTitle {
+  color: #fff;
+  font-size: 1.5rem;          /* ルートフォントサイズに依存 */
+  margin: 0;                  /* デフォルトマージンをリセット */
+  white-space: nowrap;        /* 折り返さない */
+}
+
+/* ── ヘッダー下のメイン領域 ── */
+.App {
+  display: flex;
+  flex: 1;                    /* ヘッダーを除いた残りの領域をすべて占有 */
+  background-color: #1a1a1a;
+  color: #fff;
+  overflow: hidden;           /* 横縦のはみ出しを禁止 */
+}
+
+/* ── パネル共通スタイル ── */
+.panel {
+  flex: 1;                    /* ユーザーパネルとトレーナーパネルを左右で均等に分割 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;           /* 子要素のはみ出し禁止 */
+}
+
+/* ── 左パネルのみ罫線 ── */
 .userPanel {
   border-right: 1px solid #444;
 }
 
+/* ── パネル上部のタイトル部分 ── */
 .panelTitle {
   background-color: #2c2c2c;
-  padding: 0.75rem 1rem;
+  padding: 0.5rem 1rem;       /* 上下 0.5rem、左右 1rem */
   font-size: 1.25rem;
   text-align: left;
   border-bottom: 1px solid #444;
+  margin: 0;                  /* h2 タグのデフォルトマージンをリセット */
+  box-sizing: border-box;
+  flex-shrink: 0;             /* これ以上は縮まない */
 }
 
+/* ── 映像・画像を表示する領域 ── */
 .panelContent {
-  flex: 1;
+  flex: 1;                    /* パネルの残り全体を占有 */
   display: flex;
   justify-content: center;
   align-items: center;
+  padding: 0;                 /* 余白なし */
   background-color: #000;
-  padding: 1rem;
+  position: relative;
+  overflow: hidden;           /* 映像や画像がはみ出しても隠す */
 }
 
 .panelContent video,
 .panelContent img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: cover;
-  border-radius: 4px;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;          /* 親要素いっぱいに広げつつ中央トリミング */
+  border-radius: 0;           /* 角丸をなくす */
 }
 
-.subtitle {
-  padding: 0.75rem 1rem;
+/* ── トレーナーパネル下部のセリフ表示欄 ── */
+.trainerPanel .subtitle {
+  padding: 0.5rem 1rem;       /* 上下 0.5rem、左右 1rem */
   background-color: rgba(0, 0, 0, 0.6);
   color: #fff;
   font-size: 1rem;
   text-align: center;
   border-top: 1px solid #444;
+  margin: 0;                  /* デフォルトマージンをリセット */
+  flex-shrink: 0;             /* これ以上は縮まない */
   word-wrap: break-word;
+}
+
+/* ── メディアクエリ：小さい画面向けに微調整 ── */
+@media (max-width: 768px) {
+  .header {
+    padding: 0.5rem 0.75rem;  /* パディングを若干小さく */
+    min-height: 50px;         /* ヘッダーの最小高さも若干下げる */
+  }
+  .headerTitle {
+    font-size: 1.25rem;       /* タイトル文字を少し縮小 */
+  }
+  .panelTitle {
+    font-size: 1.125rem;
+    padding: 0.4rem 0.75rem;
+  }
+  .subtitle {
+    font-size: 0.9rem;
+    padding: 0.4rem 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: 0.4rem 0.5rem;
+    min-height: 45px;
+  }
+  .headerTitle {
+    font-size: 1.1rem;
+  }
+  .panelTitle {
+    font-size: 1rem;
+    padding: 0.3rem 0.5rem;
+  }
+  .subtitle {
+    font-size: 0.8rem;
+    padding: 0.3rem 0.5rem;
+  }
 }
