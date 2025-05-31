@@ -16,106 +16,113 @@ const AvatarViewer = ({ vrmUrl }) => {
     const mount = mountRef.current;
     if (!mount) return;
 
-    const width = mount.clientWidth;
-    const height = mount.clientHeight;
+    let initialized = false;
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);
-    sceneRef.current = scene;
+    const tryInitialize = () => {
+      if (initialized) return;
 
-    // カメラ作成（仮の位置で初期化）
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.set(0, 1, 3);
-    cameraRef.current = camera;
+      const width = mount.clientWidth;
+      const height = mount.clientHeight;
 
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setClearColor(0x000000, 0);
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    rendererRef.current = renderer;
+      if (width === 0 || height === 0) return; // ← サイズが0なら何もしない
 
-    mount.appendChild(renderer.domElement);
+      initialized = true;
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    directionalLight.position.set(1.0, 1.0, 1.0).normalize();
-    scene.add(directionalLight);
+      // === Three.js 初期化ここから ===
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x000000);
+      sceneRef.current = scene;
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
+      const z = 3.0;
+      const fovDeg = 45;
+      const fovRad = THREE.MathUtils.degToRad(fovDeg);
+      const yBottom = -0.0;
+      const cameraY = yBottom + Math.tan(fovRad / 2) * z - 0.5;
 
-    const loader = new GLTFLoader();
-    loader.register((parser) => new VRMLoaderPlugin(parser));
+      const camera = new THREE.PerspectiveCamera(fovDeg, width / height, 0.1, 1000);
+      camera.position.set(0, cameraY, z);
+      camera.lookAt(0, yBottom + 0.2, 0)
+      cameraRef.current = camera;
 
-    const url = vrmUrl.startsWith('/') ? vrmUrl : `/${vrmUrl}`;
-    loader.load(
-      url,
-      (gltf) => {
-        const vrm = gltf.userData.vrm;
-        vrmRef.current = vrm;
+      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      renderer.setClearColor(0x000000, 0);
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      rendererRef.current = renderer;
 
-        vrm.scene.scale.set(1.5, 1.5, 1.5);
-        vrm.scene.position.set(0, -0.8, 0);
+      mount.appendChild(renderer.domElement);
 
-        scene.add(vrm.scene);
+      const light = new THREE.DirectionalLight(0xffffff, 1.0);
+      light.position.set(1.0, 1.0, 1.0).normalize();
+      scene.add(light);
+      scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-        console.log('✔ VRM model loaded:', vrm);
-      },
-      (progress) => {
-        console.log(`Loading VRM: ${(progress.loaded / progress.total * 100).toFixed(1)}%`);
-      },
-      (error) => {
-        console.error('✖ Error loading VRM:', error);
-      }
-    );
+      const loader = new GLTFLoader();
+      loader.register((parser) => new VRMLoaderPlugin(parser));
+      const url = vrmUrl.startsWith('/') ? vrmUrl : `/${vrmUrl}`;
+      loader.load(
+        url,
+        (gltf) => {
+          const vrm = gltf.userData.vrm;
+          vrmRef.current = vrm;
+          vrm.scene.scale.set(1.5, 1.5, 1.5);
+          vrm.scene.position.set(0, -2.0, 0);
+          scene.add(vrm.scene);
+        }
+      );
 
-    const animate = () => {
-      renderer.render(scene, camera);
-      requestIdRef.current = requestAnimationFrame(animate);
+      const animate = () => {
+        renderer.render(scene, camera);
+        requestIdRef.current = requestAnimationFrame(animate);
+      };
+      animate();
+
+      const updateCameraToKeepBottomVisible = () => {
+        const newWidth = mount.clientWidth;
+        const newHeight = mount.clientHeight;
+        const cam = cameraRef.current;
+        if (!cam) return;
+
+        cam.aspect = newWidth / newHeight;
+
+        const newFovRad = Math.atan((cam.position.y - yBottom) / cam.position.z) * 2;
+        cam.fov = THREE.MathUtils.radToDeg(newFovRad);
+        cam.updateProjectionMatrix();
+
+        renderer.setSize(newWidth, newHeight);
+      };
+
+      const observer = new ResizeObserver(updateCameraToKeepBottomVisible);
+      observer.observe(mount);
+      updateCameraToKeepBottomVisible();
+
+      // クリーンアップ
+      const cleanup = () => {
+        cancelAnimationFrame(requestIdRef.current);
+        observer.disconnect();
+        if (vrmRef.current) {
+          scene.remove(vrmRef.current.scene);
+          if (typeof vrmRef.current.dispose === 'function') {
+            vrmRef.current.dispose();
+          }
+          vrmRef.current = null;
+        }
+        if (renderer.domElement && mount) {
+          mount.removeChild(renderer.domElement);
+        }
+        renderer.dispose();
+      };
+
+      window.addEventListener('beforeunload', cleanup);
     };
-    animate();
 
-    // y=0 を常に画面の下端に映すようにカメラ位置を調整
-    const updateCameraToKeepBottomVisible = () => {
-      const newWidth = mount.clientWidth;
-      const newHeight = mount.clientHeight;
-
-      const cam = cameraRef.current;
-      if (!cam) return;
-
-      cam.aspect = newWidth / newHeight;
-
-      const z = cam.position.z; // 固定で使う
-      const cameraY = cam.position.y; // たとえば 1.5 など
-      const yBottom = 0.0;
-
-      // 「視野の半分 = Yから下端までの距離 / Z」
-      const fovRad = Math.atan((cameraY - yBottom) / z) * 2;
-      cam.fov = THREE.MathUtils.radToDeg(fovRad);
-
-      cam.updateProjectionMatrix();
-      renderer.setSize(newWidth, newHeight);
-    };
-
-    const observer = new ResizeObserver(updateCameraToKeepBottomVisible);
-    observer.observe(mount);
-    updateCameraToKeepBottomVisible(); // 初期表示時にも呼ぶ
+    const sizeObserver = new ResizeObserver(() => {
+      tryInitialize();
+    });
+    sizeObserver.observe(mount);
 
     return () => {
-      cancelAnimationFrame(requestIdRef.current);
-      observer.disconnect();
-
-      if (vrmRef.current) {
-        scene.remove(vrmRef.current.scene);
-        if (typeof vrmRef.current.dispose === 'function') {
-          vrmRef.current.dispose();
-        }
-        vrmRef.current = null;
-      }
-
-      if (renderer.domElement && mountRef.current) {
-        mountRef.current.removeChild(renderer.domElement);
-      }
-      renderer.dispose();
+      sizeObserver.disconnect();
     };
   }, [vrmUrl]);
 
