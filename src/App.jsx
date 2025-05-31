@@ -26,7 +26,8 @@ function App() {
           <h2 className="panelTitle">Trainer</h2>
           <div className="panelContent">
             {/* ここで <img> ではなく <AvatarViewer> を使う */}
-            <AvatarViewer vrmUrl="/avatars/avatar.vrm" />
+            {/* <AvatarViewer vrmUrl="/avatars/avatar.vrm" /> */}
+            <AvatarViewer vrmUrl="/avatars/sport_girl.vrm" />
           </div>
           <div className="subtitle">
             トレーナーのセリフがここに表示されます

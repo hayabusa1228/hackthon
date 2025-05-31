@@ -30,10 +30,11 @@ const AvatarViewer = ({ vrmUrl }) => {
 
       // === Three.js 初期化ここから ===
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x000000);
+      // scene.background = new THREE.Color(0x000000); // transparent so CSS background is visible
       sceneRef.current = scene;
 
-      const z = 3.0;
+      // カメラを少し引き気味に設定
+      const z = 4.0;
       const fovDeg = 45;
       const fovRad = THREE.MathUtils.degToRad(fovDeg);
       const yBottom = -0.0;
@@ -67,6 +68,28 @@ const AvatarViewer = ({ vrmUrl }) => {
           vrmRef.current = vrm;
           vrm.scene.scale.set(1.5, 1.5, 1.5);
           vrm.scene.position.set(0, -2.0, 0);
+          // モデルの正面をカメラ側に向ける
+          vrm.scene.rotation.y = Math.PI;
+
+          // チアリングポーズ：腕を前後および上下に上げる
+          if (vrm.humanoid) {
+            const leftUp = vrm.humanoid.getBoneNode('leftUpperArm');
+            const rightUp = vrm.humanoid.getBoneNode('rightUpperArm');
+            // upperArm を前に少し上に傾け、外側にも広げる
+            if (leftUp) {
+              leftUp.rotation.x = -Math.PI / 4;  // 前に上げる
+              leftUp.rotation.z = Math.PI / 4;   // 外側に開く
+            }
+            if (rightUp) {
+              rightUp.rotation.x = -Math.PI / 4;
+              rightUp.rotation.z = -Math.PI / 4;
+            }
+            // lowerArm を少し曲げる
+            const leftLo = vrm.humanoid.getBoneNode('leftLowerArm');
+            const rightLo = vrm.humanoid.getBoneNode('rightLowerArm');
+            if (leftLo) leftLo.rotation.x = -Math.PI / 8;
+            if (rightLo) rightLo.rotation.x = -Math.PI / 8;
+          }
           scene.add(vrm.scene);
         }
       );

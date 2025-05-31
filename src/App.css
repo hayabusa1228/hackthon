@@ -67,10 +67,6 @@ body,
   border-right: 1px solid #444;
 }
 
-.trainerPanel {
-  /* 右パネルに特別な罫線はなし */
-}
-
 /* ── パネル上部タイトル ── */
 .panelTitle {
   background-color: #2c2c2c;
@@ -100,6 +96,11 @@ body,
   position: relative;
   overflow: hidden;
   /* はみ出しは禁止 */
+}
+
+.trainerPanel .panelContent {
+  /* トレーナーパネルの背景をジム画像に設定 */
+  background: url('./assets/fitnessclub_gym05.png') center center / cover no-repeat;
 }
 
 /* --------------------------------------------------- */
