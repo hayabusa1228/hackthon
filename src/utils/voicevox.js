@@ -1,33 +1,26 @@
 // src/utils/voicevox.js
-// VOICEVOX の REST API を利用してテキストを音声合成し再生する関数
+// 改善版: su-shiki のホスト型 VoiceVox API を使って、一度のリクエストで音声を取得・再生する例
 
 export async function textToSpeech(text, speaker = 2) {
   if (!text) return;
-  // 1. クエリを作成
-  const queryRes = await fetch(
-    `http://localhost:50021/audio_query?speaker=${speaker}&text=${encodeURIComponent(text)}`,
-    { method: 'POST' }
-  );
-  if (!queryRes.ok) {
-    throw new Error(`audio_query failed: ${queryRes.statusText}`);
-  }
-  const queryJson = await queryRes.json();
+  // 取得した API キーをここに貼り付けてください
+  const apiKey = "m_5674K00704964";
 
-  // 2. 音声を合成
-  const synthesisRes = await fetch(
-    `http://localhost:50021/synthesis?speaker=${speaker}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(queryJson),
-    }
-  );
-  if (!synthesisRes.ok) {
-    throw new Error(`synthesis failed: ${synthesisRes.statusText}`);
-  }
-  const audioBlob = await synthesisRes.blob();
+  // 1. テキストをエンコードし、GET パラメータ付きの URL を作成
+  const query = encodeURIComponent(text);
+  const url = `https://api.su-shiki.com/v2/voicevox/audio/?text=${query}&speaker=${speaker}&key=${apiKey}`;
 
-  // 3. 再生
+  // 2. fetch で一度のリクエストで音声データを取得
+  const res = await fetch(url, {
+    method: "GET",
+    mode: "cors" // CORS はすでに許可済みなのでそのまま呼べます
+  });
+  if (!res.ok) {
+    throw new Error(`VoiceVox API failed: ${res.status} ${res.statusText}`);
+  }
+
+  // 3. Blob を生成して再生
+  const audioBlob = await res.blob();
   const audioUrl = URL.createObjectURL(audioBlob);
   const audio = new Audio(audioUrl);
   await audio.play();
