@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { VRMLoaderPlugin } from '@pixiv/three-vrm';
+import { textToSpeech } from './utils/voicevox';
 
 const AvatarViewer = ({ vrmUrl }) => {
   const mountRef = useRef(null);
@@ -147,6 +148,7 @@ const AvatarViewer = ({ vrmUrl }) => {
   useEffect(() => {
     if (!vrmRef.current) return;
     applyPose(pose, vrmRef.current);
+    textToSpeech(`ポーズを変更しました。`); // 音声合成関数を呼び出す
   }, [pose]);
 
   // -------------------------------------------------------
