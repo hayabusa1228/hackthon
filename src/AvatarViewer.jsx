@@ -148,7 +148,11 @@ const AvatarViewer = ({ vrmUrl }) => {
   useEffect(() => {
     if (!vrmRef.current) return;
     applyPose(pose, vrmRef.current);
-    textToSpeech(`ポーズを変更しました。`); // 音声合成関数を呼び出す
+    if (pose === 'Cheer') {
+      textToSpeech(`がんばって`); // 音声合成関数を呼び出す
+    } else if (pose === 'Relax') {
+      textToSpeech(`いいかんじ`); // 音声合成関数を呼び出す
+    }
   }, [pose]);
 
   // -------------------------------------------------------

@@ -1,7 +1,15 @@
 // src/utils/voicevox.js
 // 改善版: su-shiki のホスト型 VoiceVox API を使って、一度のリクエストで音声を取得・再生する例
 
-export async function textToSpeech(text, speaker = 2) {
+// 声の候補
+// 8
+// 9
+// 10: 
+// 14:
+// 20
+// 43
+
+export async function textToSpeech(text, speaker = 10) {
   if (!text) return;
   // 取得した API キーをここに貼り付けてください
   const apiKey = "m_5674K00704964";
