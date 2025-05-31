@@ -9,7 +9,7 @@
 // 20
 // 43
 
-export async function textToSpeech(text, speaker = 10) {
+export async function textToSpeech(text, speaker = 13) {
   if (!text) return;
   // 取得した API キーをここに貼り付けてください
   const apiKey = "m_5674K00704964";

@@ -5,7 +5,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { VRMLoaderPlugin } from '@pixiv/three-vrm';
 import { textToSpeech } from './utils/voicevox';
 
-const AvatarViewer = ({ vrmUrl }) => {
+const AvatarViewer = ({ vrmUrl, preloadedVrm }) => {
   const mountRef = useRef(null);
   const rendererRef = useRef(null);
   const sceneRef = useRef(null);
@@ -60,37 +60,42 @@ const AvatarViewer = ({ vrmUrl }) => {
       scene.add(light);
       scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-      // === VRM ローダー ===
-      const loader = new GLTFLoader();
-      loader.register((parser) => new VRMLoaderPlugin(parser));
-
-      const url = vrmUrl.startsWith('/') ? vrmUrl : `/${vrmUrl}`;
-      loader.load(
-        url,
-        (gltf) => {
-          const vrm = gltf.userData.vrm;
-          if (!vrm) {
-            console.error('gltf.userData.vrm が取得できません。');
-            return;
+      // VRM読み込み or プリロード済み利用
+      if (preloadedVrm) {
+        vrmRef.current = preloadedVrm;
+        // モデルのスケール・位置・回転を調整
+        preloadedVrm.scene.scale.set(1.5, 1.5, 1.5);
+        preloadedVrm.scene.position.set(0, -2.0, 0);
+        preloadedVrm.scene.rotation.y = Math.PI;
+        // 初期ポーズ（Relax）を適用
+        applyPose('Relax', preloadedVrm);
+        scene.add(preloadedVrm.scene);
+      } else {
+        // === VRM ローダー ===
+        const loader = new GLTFLoader();
+        loader.register((parser) => new VRMLoaderPlugin(parser));
+        const url = vrmUrl.startsWith('/') ? vrmUrl : `/${vrmUrl}`;
+        loader.load(
+          url,
+          (gltf) => {
+            const vrm = gltf.userData.vrm;
+            if (!vrm) {
+              console.error('gltf.userData.vrm が取得できません。');
+              return;
+            }
+            vrmRef.current = vrm;
+            vrm.scene.scale.set(1.5, 1.5, 1.5);
+            vrm.scene.position.set(0, -2.0, 0);
+            vrm.scene.rotation.y = Math.PI;
+            applyPose('Relax', vrm);
+            scene.add(vrm.scene);
+          },
+          undefined,
+          (error) => {
+            console.error('VRM 読み込みエラー:', error);
           }
-
-          vrmRef.current = vrm;
-
-          // モデルのスケール・位置・回転を調整
-          vrm.scene.scale.set(1.5, 1.5, 1.5);
-          vrm.scene.position.set(0, -2.0, 0);
-          vrm.scene.rotation.y = Math.PI; // 正面をカメラ側に向ける
-
-          // 初期ポーズ（Relax）を適用
-          applyPose('Relax', vrm);
-
-          scene.add(vrm.scene);
-        },
-        undefined,
-        (error) => {
-          console.error('VRM 読み込みエラー:', error);
-        }
-      );
+        );
+      }
 
       // レンダーループ
       const animate = () => {
@@ -142,7 +147,7 @@ const AvatarViewer = ({ vrmUrl }) => {
     return () => {
       sizeObserver.disconnect();
     };
-  }, [vrmUrl]);
+  }, [vrmUrl, preloadedVrm]);
 
   // “pose” ステートが変わるたびに applyPose を呼び出し
   useEffect(() => {
