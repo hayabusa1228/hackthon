@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 
-const Camera = () => {
+const Camera = ({ onEvaluation }) => {
   const videoRef = useRef(null);
-  // const intervalRef = useRef(null);
+  const intervalRef = useRef(null);
 
   useEffect(() => {
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -11,9 +11,7 @@ const Camera = () => {
         .then((stream) => {
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
-            videoRef.current.play().catch(() => {
-              // play interrupted by new load request, ignore
-            });
+            videoRef.current.play().catch(() => { });
           }
         })
         .catch((err) => {
@@ -21,37 +19,42 @@ const Camera = () => {
         });
     }
 
-    // // 5秒ごとにカメラ画像をサーバーへPOST
-    // intervalRef.current = setInterval(() => {
-    //   const video = videoRef.current;
-    //   if (!video || video.readyState < 2) return;
-    //   (async () => {
-    //     const canvas = document.createElement('canvas');
-    //     canvas.width = video.videoWidth;
-    //     canvas.height = video.videoHeight;
-    //     const ctx = canvas.getContext('2d');
-    //     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    //     const blob = await new Promise((resolve) =>
-    //       canvas.toBlob(resolve, 'image/png')
-    //     );
-    //     if (!blob) return;
-    //     const form = new FormData();
-    //     form.append('image', blob, 'frame.png');
-    //     try {
-    //       await fetch('http://localhost:8000/upload', {
-    //         method: 'POST',
-    //         body: form,
-    //       });
-    //     } catch (e) {
-    //       console.error('Upload failed:', e);
-    //     }
-    //   })();
-    // }, 5000);
+    intervalRef.current = setInterval(() => {
+      const video = videoRef.current;
+      if (!video || video.readyState < 2) return;
 
-    // // クリーンアップ
-    // return () => {
-    //   if (intervalRef.current) clearInterval(intervalRef.current);
-    // };
+      (async () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const blob = await new Promise((resolve) =>
+          canvas.toBlob(resolve, 'image/png')
+        );
+        if (!blob) return;
+
+        const form = new FormData();
+        form.append('image', blob, 'frame.png');
+
+        try {
+          const res = await fetch('http://127.0.0.1:8000/api/post_image', {
+            method: 'POST',
+            body: form,
+          });
+          const json = await res.json();
+          console.log('LLM評価結果:', json.evaluation);
+          onEvaluation?.(json.evaluation); // ← 親へ通知
+        } catch (e) {
+          console.error('Upload failed:', e);
+        }
+      })();
+    }, 5000);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, []);
 
   return (
@@ -59,13 +62,14 @@ const Camera = () => {
       <video
         ref={videoRef}
         autoPlay
+        muted
+        playsInline
         style={{
           width: '100%',
           height: '100%',
           objectFit: 'cover',
+          borderRadius: '12px',
         }}
-        muted
-        playsInline
       />
     </div>
   );

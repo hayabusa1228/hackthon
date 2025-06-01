@@ -1,22 +1,31 @@
+# backend/main.py
+
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import cv2
 import os
+import cv2
 import numpy as np
-import pose_estimation as ps
+
 import vertexai
 from vertexai.generative_models import GenerativeModel, Part
-import time
+
+# ① 起動時に一度だけ Vertex AI を初期化（プロジェクトID と リージョンを指定）
+vertexai.init(
+    project="overfit-461602",
+    location="asia-northeast1"
+)
+
+from backend import pose_estimation as ps
 
 app = FastAPI()
 
-# CORS設定
+# CORS設定（必要に応じて origin を追加）
 origins = [
     "http://localhost",
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-    "https://your-frontend-domain.com"
-
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000"
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -26,121 +35,86 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ② 利用するモデル名を「asia-northeast1」で動作する最新バージョンに設定
+MODEL_NAME = "gemini-1.5-flash-002"
 
 
 @app.post("/api/post_image")
 async def post_image(image: UploadFile = File(...)):
-    print("Received image:", image.filename)
     try:
-        # 画像受信・読み込み
+        print("📥 POST受信")
         contents = await image.read()
+        print(f"📏 画像サイズ: {len(contents)} bytes")
+
         nparr = np.frombuffer(contents, np.uint8)
         img_cv = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         if img_cv is None:
-            raise HTTPException(status_code=400, detail="Could not decode image.")
+            print("⚠️ OpenCV decode失敗")
+            raise HTTPException(status_code=400, detail="画像のデコードに失敗しました。")
 
-        # 姿勢推定 & オーバーレイ画像取得
-        start_time = time.time()
-        pose_info, overlay_image_base64 = ps.pose_estimation(img_cv)
-        elapsed_time = time.time() - start_time
-        print(f"Pose estimation took {elapsed_time:.2f} seconds")
-        print("Pose info:", pose_info)
+        print("✅ OpenCV decode成功")
 
-        # Gemini用プロンプト作成
-        
-        start_time = time.time()
-        processed_data = text_processing(pose_info)
-        generated_text = await generate_text(processed_data)
-        elapsed_time = time.time() - start_time
-        print(f"Text generation took {elapsed_time:.2f} seconds")
+        pose_info, _ = ps.pose_estimation(img_cv)
+        print(f"📊 Pose info: {pose_info}")
 
-        # APIレスポンス： LLM結果 + 画像
-        return {
-            "generated_text": generated_text["generated_text"],
-            # "overlay_image_base64": overlay_image_base64
-        }
-        
+        prompt = text_processing(pose_info)
+        print(f"🧾 Prompt:\n{prompt}")
+
+        result_text = await generate_text(prompt)
+        print(f"📤 LLM応答: {result_text}")
+
+        return {"evaluation": result_text}
+
     except Exception as e:
-        import traceback
-        print(traceback.format_exc())
+        print(f"❌ エラー内容: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    
-def text_processing(pose_info):
 
-    if pose_info is None:
-        text = f"""
-            あなたは経験豊富で、励ますのが得意なフィットネスコーチAIです。
-            ユーザがプランクを行っていますが、認識できる骨格データがありません。
-            ユーザがプランクの姿勢になって体全体を映すように促してください。
-            回答は1行(30文字以内)に制限します。
-        """
 
-    else:
-        text = f"""
-    あなたは経験豊富で、励ますのが得意なフィットネスコーチAIです。
-    ユーザーが行っている特定の筋トレエクササイズに関する骨格データを受け取り、その姿勢が適切かどうかを判断し、改善のための具体的で実行可能なアドバイスを生成してください。画像は提供されません。
-    回答は1行(30文字以内)に制限します。
 
-    1. 対象エクササイズ:
-    プランク
-
-    ## 2. ユーザーの骨格データ:
-    （あなたのアプリが抽出できる骨格情報を、明確で一貫性のある形式でここに記述します。単純な座標よりも、関節角度や相対的な位置関係、定性的な観察結果の方がLLMは理解しやすいです。）
-
-    例:
-    * **主要な関節角度 (度):**
-        * 右股関節の角度（大腿骨と胴体のなす角度）: {pose_info['right_hip_angle']}
-        * 左股関節の角度（大腿骨と胴体のなす角度）: {pose_info['left_hip_angle']}
-        * 肩と腰と足首の位置関係（側面から見て一直線に近いか）: {pose_info['shoulder_hip_ankle_alignment']}
-
-    ## 3. [対象エクササイズ名] の正しい姿勢のポイント:
-    （このエクササイズにおける正しいフォームの主要な要素を具体的に記述します。LLMが比較するための基準となります。）
-
-    例 (スクワットの場合):
-    * 腰は膝よりも低い位置まで下げる（パラレルスクワット以上）。
-    * 背中は自然なS字カーブを保ち、丸まったり過度に反ったりしない。
-    * 膝はつま先と同じ方向に向け、内側に入らないようにする。
-    * かかとは動作全体を通じて床にしっかりと接地させる。
-    * 頭は背骨の延長線上に保つ。
-
-    ## 4. あなたのタスク:
-    1.  上記の「ユーザーの骨格データ」と「正しい姿勢のポイント」を比較・分析してください。
-    2.  ユーザーの姿勢が正しいかどうかを判断し、必要な改善点を特定してください。
-    3.  ユーザーの姿勢が正しい場合は「素晴らしい！その調子です！」と励ましのメッセージを返してください。
-    4.  ユーザーの姿勢が正しくない場合は、改善点を指摘してください。
-    5.  常に励ますような、協力的でポジティブなトーンを保ってください。
-    6.  アバターに反映するため、喜怒哀楽の感情を1つ選んでください。
-
-    ## 5. 出力形式:
-    出力はJSON形式で、以下のキーを含めてください。
-    ```json
-    {{
-        "感情": "喜び, 怒り, 悲しみ, 楽しみのいずれか",
-        "テキスト": "あなたのテキストをここに記述してください。"
-    }}
+def text_processing(pose_info: dict) -> str:
     """
-    return text
+    Pose Estimation の結果（pose_info）をもとに、
+    プランク姿勢の簡潔な評価を依頼するプロンプトを生成する。
+    """
+    return f"""
+以下の【骨格データ】をもとに、プランク姿勢が適切かどうかを【ガイドライン】に従って評価し【アドバイス】に従って「簡潔に」アドバイスをしてください。
+不要な情報は省き、1文程度の短い文章で伝えてください。
 
-PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
-LOCATION = "asia-northeast1"
-MODEL_NAME = "gemini-1.5-flash-002"
-vertexai.init(project=PROJECT_ID, location=LOCATION)
+【骨格データ】
+- 右股関節の角度: {pose_info['right_hip_angle']}°
+- 左股関節の角度: {pose_info['left_hip_angle']}°
 
-async def generate_text(text: str):
-    # try:
+【ガイドライン】
+・股関節の角度が155度以上170度以下が良く、155度未満は腰が浮いており、175度を超えると腰が落ちすぎています。
+・股関節の角度が165度+-3度の時はとても素晴らしい姿勢です。
+
+【アドバイス】
+・熱血トレーナーのような口調、例えば「いい感じだ！」や「そんなんじゃなりたいお前になれないぞ！」のような口調で檄を飛ばしてください。
+・とても素晴らしい姿勢の時はめちゃくちゃ褒めてください
+・股関節の角度が155度以上170度に収まっていない場合は「腰が下がっているぞ！」「腰が浮いているぞ！」などと指摘し、檄を飛ばしたり煽ったりしてください。
+・とても素晴らしい姿勢でも155度以上175度範囲外でもないときは、まあまあいいとして適当に応援してください。
+
+出力はアドバイスを、1~2文で書いてください。なお、165度+-3度などの具体的な数値はアドバイスに含めないでください。
+"""
+
+
+
+async def generate_text(text: str) -> str:
+    """
+    プロンプト文字列を受け取り、Vertex AI を呼び出して
+    「簡潔なテキスト評価」をそのまま返す関数。
+    """
+    try:
         model = GenerativeModel(MODEL_NAME)
         response = await model.generate_content_async([Part.from_text(text)])
-
         if response.candidates and len(response.candidates) > 0:
             parts = response.candidates[0].content.parts
             if parts and len(parts) > 0:
-                generated_text = parts[0].text
-                return {"generated_text": generated_text}
-            else:
-                raise HTTPException(status_code=500, detail="No content parts in Gemini response.")
-        else:
-            raise HTTPException(status_code=500, detail="No candidates in Gemini response.")
-
-    # except Exception as e:
-    #     raise HTTPException(status_code=500, detail=f"Error generating text: {str(e)}")
+                # JSON やマークダウンではなく純粋なテキストだけを返す
+                return parts[0].text.strip()
+        raise HTTPException(status_code=500, detail="LLM から適切な応答が得られませんでした。")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating text: {str(e)}")
