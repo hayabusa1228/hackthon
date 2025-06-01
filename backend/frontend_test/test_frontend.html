@@ -2,52 +2,77 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>単一フレーム送信テスト</title>
+    <title>画像送信テスト (Webカメラ & ファイル)</title>
     <style>
         body { font-family: sans-serif; margin: 20px; line-height: 1.6; }
-        video {
+        video, #imagePreview {
             border: 1px solid black;
-            transform: scaleX(-1); /* Webカメラ映像を鏡映しで表示 */
             background-color: #333;
             margin-bottom: 10px;
+            max-width: 640px;
+            max-height: 480px;
+        }
+        video {
+            transform: scaleX(-1); /* Webカメラ映像を鏡映しで表示 */
+        }
+        #imagePreview {
+             min-height: 100px; /* プレビューエリアの最小高さ */
+             display: block; /* imgがインライン要素なのでブロック要素にする */
         }
         canvas {
             display: none; /* フレームキャプチャ用なので非表示 */
         }
-        .controls { margin-top: 10px; margin-bottom: 10px; }
-        .controls label { margin-right: 5px; }
-        .controls input[type="text"] { width: 400px; margin-right: 10px; padding: 5px; }
-        .controls button { padding: 8px 15px; margin-right: 10px; }
+        .controls, .file-upload-controls { margin-top: 10px; margin-bottom: 20px; }
+        .controls label, .file-upload-controls label { margin-right: 5px; display: block; margin-bottom: 5px;}
+        .controls input[type="text"], .file-upload-controls input[type="file"] {
+            width: 400px; margin-right: 10px; padding: 5px; margin-bottom: 10px;
+        }
+        .controls button, .file-upload-controls button { padding: 8px 15px; margin-right: 10px; }
         #status { font-weight: bold; }
         #responseArea { margin-top:10px; padding:10px; border:1px solid #eee; background-color:#f5f5f5; min-height: 50px; white-space: pre-wrap;}
+        hr { margin: 30px 0; }
     </style>
 </head>
 <body>
-    <h1>単一フレーム送信テスト</h1>
-
-    <video id="webcam" width="640" height="480" autoplay playsinline muted></video>
-    <canvas id="captureCanvas"></canvas>
+    <h1>画像送信テスト (Webカメラ & ファイル)</h1>
 
     <div class="controls">
-        <label for="backendUrl">バックエンドURL:</label>
-        <input type="text" id="backendUrl" value="http://127.0.0.1:3001/api/post_image">
+        <label for="backendUrl">バックエンドAPI URL:</label>
+        <input type="text" id="backendUrl" value="http://127.0.0.1:3000/api/post_image">
         <p style="font-size: 0.8em; color: grey;">例: http://localhost:8000/api/process_frame</p>
     </div>
 
-    <div class="controls">
+    <hr>
+
+    <h2>Webカメラから送信</h2>
+    <video id="webcam" width="640" height="480" autoplay playsinline muted></video>
+    <canvas id="captureCanvas"></canvas> <div class="controls">
         <button id="startWebcamButton">Webカメラ開始</button>
-        <button id="captureSendButton" disabled>画像キャプチャして送信</button>
+        <button id="captureSendButton" disabled>現在のフレームをキャプチャして送信</button>
         <button id="stopWebcamButton" disabled>Webカメラ停止</button>
     </div>
 
+    <hr>
+
+    <h2>ローカルファイルから送信</h2>
+    <div class="file-upload-controls">
+        <label for="imageUpload">画像ファイルを選択:</label>
+        <input type="file" id="imageUpload" accept="image/*">
+        <button id="sendFileButton" disabled>選択した画像を送信</button>
+        <p>プレビュー:</p>
+        <img id="imagePreview" src="#" alt="選択された画像のプレビュー" >
+    </div>
+
+
+    <hr>
     <p>ステータス: <span id="status">待機中</span></p>
     <p>バックエンドからの応答:</p>
     <div id="responseArea">ここにバックエンドからの応答が表示されます。</div>
 
     <script>
         const videoElement = document.getElementById('webcam');
-        const canvasElement = document.getElementById('captureCanvas');
-        const ctx = canvasElement.getContext('2d', { willReadFrequently: true });
+        const captureCanvas = document.getElementById('captureCanvas'); // 名前変更
+        const captureCtx = captureCanvas.getContext('2d', { willReadFrequently: true });
         const startWebcamButton = document.getElementById('startWebcamButton');
         const captureSendButton = document.getElementById('captureSendButton');
         const stopWebcamButton = document.getElementById('stopWebcamButton');
@@ -55,40 +80,39 @@
         const backendUrlInput = document.getElementById('backendUrl');
         const responseArea = document.getElementById('responseArea');
 
-        // --- 設定値 ---
-        const CAPTURE_WIDTH = 320;  // 送信する画像の幅
-        const CAPTURE_HEIGHT = 240; // 送信する画像の高さ
+        const imageUploadInput = document.getElementById('imageUpload');
+        const sendFileButton = document.getElementById('sendFileButton');
+        const imagePreview = document.getElementById('imagePreview');
+
+
+        // --- 設定値 (Webカメラとファイルアップロード共通) ---
+        const TARGET_CAPTURE_WIDTH = 320;  // 送信する画像の幅
+        const TARGET_CAPTURE_HEIGHT = 240; // 送信する画像の高さ
         const IMAGE_FORMAT = 'image/webp'; // 'image/jpeg' も可
-        const IMAGE_QUALITY = 0.8;   // 0.0 (低品質/高圧縮) から 1.0 (高品質/低圧縮)
+        const IMAGE_QUALITY = 0.8;   // 0.0 から 1.0
         // --- ---
 
         let mediaStream = null;
 
+        // Webカメラ関連の関数
         async function startWebcam() {
-            if (mediaStream) return; // 既に開始している場合は何もしない
-
+            if (mediaStream) return;
             try {
                 mediaStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        width: { ideal: 640 },
-                        height: { ideal: 480 }
-                    },
+                    video: { width: { ideal: 640 }, height: { ideal: 480 } },
                     audio: false
                 });
                 videoElement.srcObject = mediaStream;
                 await new Promise(resolve => videoElement.onloadedmetadata = resolve);
                 videoElement.play();
-
                 statusSpan.textContent = 'カメラ起動中。キャプチャ可能です。';
                 startWebcamButton.disabled = true;
                 captureSendButton.disabled = false;
                 stopWebcamButton.disabled = false;
                 backendUrlInput.disabled = true;
-
             } catch (err) {
                 console.error('Error accessing webcam:', err);
                 statusSpan.textContent = `カメラエラー: ${err.message}`;
-                responseArea.textContent = `カメラへのアクセスに失敗しました。許可を確認してください。`;
             }
         }
 
@@ -102,75 +126,125 @@
             startWebcamButton.disabled = false;
             captureSendButton.disabled = true;
             stopWebcamButton.disabled = true;
-            backendUrlInput.disabled = false;
+            if (!imageUploadInput.files.length) { // ファイルも選択されていなければURL入力を有効化
+                 backendUrlInput.disabled = false;
+            }
         }
 
-        async function captureAndSendFrame() {
+        // フレーム/画像データをバックエンドに送信する共通関数
+        async function sendImageDataToBackend(blob, sourceDescription) {
             const backendUrl = backendUrlInput.value.trim();
             if (!backendUrl) {
                 alert('バックエンドURLを入力してください。');
-                return;
+                return false;
             }
+            if (!blob) {
+                console.error(`No blob data to send from ${sourceDescription}.`);
+                statusSpan.textContent = `送信するデータがありません (${sourceDescription})。`;
+                return false;
+            }
+
+            statusSpan.textContent = `${sourceDescription} からフレームを送信中...`;
+            // 送信中は関連ボタンを無効化
+            captureSendButton.disabled = true;
+            sendFileButton.disabled = true;
+
+            const formData = new FormData();
+            formData.append('image', blob, `image-${Date.now()}.webp`);
+
+            try {
+                const response = await fetch(backendUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+                const responseData = await response.json();
+                if (response.ok) {
+                    console.log(`Backend response (from ${sourceDescription}):`, responseData);
+                    responseArea.textContent = JSON.stringify(responseData, null, 2);
+                    statusSpan.textContent = `送信完了 (${sourceDescription})。応答受信。`;
+                } else {
+                    console.error(`Backend error (from ${sourceDescription}):`, response.status, responseData);
+                    responseArea.textContent = `バックエンドエラー (${sourceDescription}): ${response.status}\n${JSON.stringify(responseData, null, 2)}`;
+                    statusSpan.textContent = `バックエンドエラー発生 (${sourceDescription})。`;
+                }
+            } catch (error) {
+                console.error(`Error sending frame from ${sourceDescription} or parsing response:`, error);
+                responseArea.textContent = `送信エラー (${sourceDescription}): ${error.message}`;
+                statusSpan.textContent = `送信エラー発生 (${sourceDescription})。`;
+            } finally {
+                // ボタンの状態を適切に戻す
+                if (mediaStream) captureSendButton.disabled = false; // Webカメラがアクティブなら再度有効化
+                if (imageUploadInput.files.length > 0) sendFileButton.disabled = false; // ファイルが選択されていれば再度有効化
+            }
+            return response.ok;
+        }
+
+        // Webカメラフレームをキャプチャして送信
+        async function captureAndSendWebcamFrame() {
             if (!mediaStream || videoElement.paused || videoElement.ended || videoElement.readyState < videoElement.HAVE_CURRENT_DATA) {
                 alert('Webカメラが開始されていないか、映像が準備できていません。');
                 return;
             }
-
-            statusSpan.textContent = 'フレームをキャプチャ・送信中...';
-            captureSendButton.disabled = true; // 送信中はボタンを無効化
-
-            // Canvasのサイズをキャプチャ解像度に設定
-            canvasElement.width = CAPTURE_WIDTH;
-            canvasElement.height = CAPTURE_HEIGHT;
-
-            // ビデオフレームをCanvasに描画 (リサイズ)
-            ctx.drawImage(videoElement, 0, 0, CAPTURE_WIDTH, CAPTURE_HEIGHT);
-
-            // Canvasの内容をBlobとして取得
-            canvasElement.toBlob(async (blob) => {
-                if (!blob) {
-                    console.error('Failed to create blob from canvas.');
-                    statusSpan.textContent = '画像データの作成に失敗しました。';
-                    captureSendButton.disabled = false;
-                    return;
-                }
-
-                const formData = new FormData();
-                formData.append('image', blob, `capture-${Date.now()}.webp`);
-
-                try {
-                    const response = await fetch(backendUrl, {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    const responseData = await response.json();
-
-                    if (response.ok) {
-                        console.log('Backend response:', responseData);
-                        responseArea.textContent = JSON.stringify(responseData, null, 2);
-                        statusSpan.textContent = '送信完了。応答受信。';
-                    } else {
-                        console.error('Backend error:', response.status, responseData);
-                        responseArea.textContent = `バックエンドエラー: ${response.status}\n${JSON.stringify(responseData, null, 2)}`;
-                        statusSpan.textContent = 'バックエンドエラー発生。';
-                    }
-                } catch (error) {
-                    console.error('Error sending frame or parsing response:', error);
-                    responseArea.textContent = `送信エラー: ${error.message}`;
-                    statusSpan.textContent = '送信エラー発生。';
-                } finally {
-                    captureSendButton.disabled = false; // ボタンを再度有効化
-                }
+            captureCanvas.width = TARGET_CAPTURE_WIDTH;
+            captureCanvas.height = TARGET_CAPTURE_HEIGHT;
+            captureCtx.drawImage(videoElement, 0, 0, TARGET_CAPTURE_WIDTH, TARGET_CAPTURE_HEIGHT);
+            captureCanvas.toBlob(async (blob) => {
+                await sendImageDataToBackend(blob, "Webカメラ");
             }, IMAGE_FORMAT, IMAGE_QUALITY);
+        }
+
+        // 選択されたローカルファイルを処理して送信
+        imageUploadInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                imagePreview.src = URL.createObjectURL(file); // プレビュー表示
+                imagePreview.style.display = 'block';
+                sendFileButton.disabled = false;
+                backendUrlInput.disabled = true; // ファイル選択中はURL入力を無効化
+            } else {
+                imagePreview.src = "#";
+                imagePreview.style.display = 'none';
+                sendFileButton.disabled = true;
+                if (!mediaStream) { // Webカメラも非アクティブならURL入力を有効化
+                    backendUrlInput.disabled = false;
+                }
+            }
+        });
+
+        async function sendSelectedFile() {
+            const file = imageUploadInput.files[0];
+            if (!file) {
+                alert('送信する画像ファイルを選択してください。');
+                return;
+            }
+
+            const img = new Image();
+            img.onload = () => {
+                captureCanvas.width = TARGET_CAPTURE_WIDTH;
+                captureCanvas.height = TARGET_CAPTURE_HEIGHT;
+                // 選択された画像をCanvasに描画してリサイズ
+                captureCtx.drawImage(img, 0, 0, TARGET_CAPTURE_WIDTH, TARGET_CAPTURE_HEIGHT);
+                // Canvasの内容をBlobとして取得し送信
+                captureCanvas.toBlob(async (blob) => {
+                    await sendImageDataToBackend(blob, "選択ファイル");
+                }, IMAGE_FORMAT, IMAGE_QUALITY);
+                URL.revokeObjectURL(img.src); // メモリ解放
+            };
+            img.onerror = () => {
+                alert('画像ファイルの読み込みに失敗しました。');
+                statusSpan.textContent = '画像読み込みエラー。';
+            }
+            img.src = URL.createObjectURL(file);
         }
 
         startWebcamButton.addEventListener('click', startWebcam);
         stopWebcamButton.addEventListener('click', stopWebcam);
-        captureSendButton.addEventListener('click', captureAndSendFrame);
+        captureSendButton.addEventListener('click', captureAndSendWebcamFrame);
+        sendFileButton.addEventListener('click', sendSelectedFile);
 
         // 初期状態
-        statusSpan.textContent = '待機中。Webカメラを開始してください。';
+        imagePreview.style.display = 'none';
+        statusSpan.textContent = '待機中。Webカメラを開始するか、ファイルを選択してください。';
 
     </script>
 </body>
