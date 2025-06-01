@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+google-cloud-aiplatform >= 1.90.0  # Vertex AI SDK
+python-dotenv          # ローカル開発時の環境変数管理用 (任意)
+mediapipe
+python-multipart
