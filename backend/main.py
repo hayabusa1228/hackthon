@@ -2,24 +2,27 @@
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import os
 import cv2
 import numpy as np
 
 import vertexai
 from vertexai.generative_models import GenerativeModel, Part
 
-# ① 起動時に一度だけ Vertex AI を初期化（プロジェクトID と リージョンを指定）
+# ─── Vertex AI の初期化（一度だけ） ───
 vertexai.init(
     project="overfit-461602",
     location="asia-northeast1"
 )
 
+# Pose Estimation モジュールの読み込み
 from backend import pose_estimation as ps
+
+# “chat.py” の router をインポートする
+from backend.chat import router as chat_router
 
 app = FastAPI()
 
-# CORS設定（必要に応じて origin を追加）
+# CORS 設定
 origins = [
     "http://localhost",
     "http://localhost:5173",
@@ -35,9 +38,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ② 利用するモデル名を「asia-northeast1」で動作する最新バージョンに設定
+# 既存の /api/post_image エンドポイント
 MODEL_NAME = "gemini-1.5-flash-002"
-
 
 @app.post("/api/post_image")
 async def post_image(image: UploadFile = File(...)):
@@ -79,25 +81,30 @@ def text_processing(pose_info: dict) -> str:
     """
     return f"""
 以下の【骨格データ】をもとに、プランク姿勢が適切かどうかを【ガイドライン】に従って評価し【アドバイス】に従って「簡潔に」アドバイスをしてください。
-不要な情報は省き、1文程度の短い文章で伝えてください。
+不要な情報は省き、1文の短い文章で伝えてください。
 
 【骨格データ】
 - 右股関節の角度: {pose_info['right_hip_angle']}°
 - 左股関節の角度: {pose_info['left_hip_angle']}°
+- 右膝の角度: {pose_info['right_knee_angle']}°
+- 左膝の角度: {pose_info['left_knee_angle']}°
+- 体幹傾き: {pose_info['torso_tilt']}°
 
 【ガイドライン】
-・股関節の角度が155度以上170度以下が良く、155度未満は腰が浮いており、175度を超えると腰が落ちすぎています。
-・股関節の角度が165度+-3度の時はとても素晴らしい姿勢です。
+・股関節の角度が155度以上170度以下が良く、155度未満は腰が浮いており、170度を超えると腰が落ちすぎています。
+・股関節の角度が165度±3度の時はとても素晴らしい姿勢です。
+・膝の角度が160度以上が良好、それ以下は膝が曲がりすぎています。
+・体幹傾きが-10度〜10度なら背中が真っ直ぐ、これを超えると姿勢が崩れています。
+・腰の高さ評価の内容も参考にしてください。
 
 【アドバイス】
 ・熱血トレーナーのような口調、例えば「いい感じだ！」や「そんなんじゃなりたいお前になれないぞ！」のような口調で檄を飛ばしてください。
-・とても素晴らしい姿勢の時はめちゃくちゃ褒めてください
-・股関節の角度が155度以上170度に収まっていない場合は「腰が下がっているぞ！」「腰が浮いているぞ！」などと指摘し、檄を飛ばしたり煽ったりしてください。
-・とても素晴らしい姿勢でも155度以上175度範囲外でもないときは、まあまあいいとして適当に応援してください。
+・全体がとても素晴らしい姿勢の時はめちゃくちゃ褒めてください。
+・部分的に問題があれば指摘してから激励してください。
+・できるだけ短く簡潔に1〜2文で出力してください。
 
-出力はアドバイスを、1~2文で書いてください。なお、165度+-3度などの具体的な数値はアドバイスに含めないでください。
+出力はアドバイスを、1文で書いてください。なお、165度+-3度などの具体的な数値はアドバイスに含めないでください。
 """
-
 
 
 async def generate_text(text: str) -> str:
@@ -118,3 +125,5 @@ async def generate_text(text: str) -> str:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating text: {str(e)}")
+
+app.include_router(chat_router)
