@@ -9,14 +9,14 @@
 // 20
 // 43
 
-export async function textToSpeech(text, speaker = 13) {
+export async function textToSpeech(text, speaker = 10) {
   if (!text) return;
   // 取得した API キーをここに貼り付けてください
-  const apiKey = "m_5674K00704964";
+  const apiKey = "d_340_h1u519x-1";
 
   // 1. テキストをエンコードし、GET パラメータ付きの URL を作成
   const query = encodeURIComponent(text);
-  const url = `https://api.su-shiki.com/v2/voicevox/audio/?text=${query}&speaker=${speaker}&key=${apiKey}`;
+  const url = `https://api.su-shiki.com/v2/voicevox/audio/?text=${query}&speaker=${speaker}&key=${apiKey}&speed=1.3`;
 
   // 2. fetch で一度のリクエストで音声データを取得
   const res = await fetch(url, {

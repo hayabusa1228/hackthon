@@ -1,11 +1,13 @@
 // src/AvatarViewer.jsx
 import React, { useEffect, useRef, useState } from 'react';
+import trainersJson from './trainers.json';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { VRMLoaderPlugin } from '@pixiv/three-vrm';
 import { textToSpeech } from './utils/voicevox';
 
-const AvatarViewer = ({ vrmUrl, preloadedVrm }) => {
+// trainerId を受け取る形に拡張
+const AvatarViewer = ({ vrmUrl, preloadedVrm, trainerId }) => {
   const mountRef = useRef(null);
   const rendererRef = useRef(null);
   const sceneRef = useRef(null);
@@ -13,8 +15,18 @@ const AvatarViewer = ({ vrmUrl, preloadedVrm }) => {
   const requestIdRef = useRef(null);
   const vrmRef = useRef(null);
 
-  // “Relax” or “Cheer” を表すステート
-  const [pose, setPose] = useState('Relax');
+  // 選択中ポーズ名
+  const [pose, setPose] = useState('Pose1');
+
+  // トレーナー情報取得
+  const trainerInfo = trainersJson.find(t => t.vrmUrl === vrmUrl || t.id === trainerId) || {};
+  // 新しいcamera, poses形式に対応
+  const cameraConfig = trainerInfo.camera || { z: 4.0, fovDeg: 45, yBottom: 0.0, cameraYOffset: -0.5, lookAtYOffset: 0.2 };
+  const poseConfig = trainerInfo.poses || {};
+  // ポーズ名リスト
+  const poseNames = Object.keys(poseConfig);
+  // 発言内容（poseごとにjsonで指定）
+  const poseSpeech = trainerInfo.poseSpeech || {};
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -35,16 +47,19 @@ const AvatarViewer = ({ vrmUrl, preloadedVrm }) => {
       const scene = new THREE.Scene();
       sceneRef.current = scene;
 
-      // カメラ設定（少し引き気味）
-      const z = 4.0;
-      const fovDeg = 45;
-      const fovRad = THREE.MathUtils.degToRad(fovDeg);
-      const yBottom = -0.0;
-      const cameraY = yBottom + Math.tan(fovRad / 2) * z - 0.5;
+      // カメラ設定（新形式対応）
+      const z = cameraConfig.z;
+      const fovDeg = cameraConfig.fovDeg;
+      const yBottom = cameraConfig.yBottom;
+      const cameraYOffset = cameraConfig.cameraYOffset;
+      const lookAtYOffset = cameraConfig.lookAtYOffset;
 
-      const camera = new THREE.PerspectiveCamera(fovDeg, width / height, 0.1, 1000);
-      camera.position.set(0, cameraY, z);
-      camera.lookAt(0, yBottom + 0.2, 0);
+      // カメラのzは「奥行き」方向。yBottom/cameraYOffsetは「上下」位置。
+      // カメラのzを直接反映し、yはyBottom+cameraYOffset（符号反転なし）
+      // yBottom - cameraYOffset で上下反転を防ぐ
+      const camera = new THREE.PerspectiveCamera(fovDeg, width / height, 0.1, 5000);
+      camera.position.set(0, yBottom - cameraYOffset, z);
+      camera.lookAt(0, yBottom + lookAtYOffset, 0);
       cameraRef.current = camera;
 
       const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
@@ -61,14 +76,16 @@ const AvatarViewer = ({ vrmUrl, preloadedVrm }) => {
       scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
       // VRM読み込み or プリロード済み利用
+      const modelYOffset = trainerInfo.modelYOffset ?? -2.0;
+      const modelScale = trainerInfo.modelScale ?? 1.5;
       if (preloadedVrm) {
         vrmRef.current = preloadedVrm;
         // モデルのスケール・位置・回転を調整
-        preloadedVrm.scene.scale.set(1.5, 1.5, 1.5);
-        preloadedVrm.scene.position.set(0, -2.0, 0);
+        preloadedVrm.scene.scale.set(modelScale, modelScale, modelScale);
+        preloadedVrm.scene.position.set(0, modelYOffset, 0);
         preloadedVrm.scene.rotation.y = Math.PI;
         // 初期ポーズ（Relax）を適用
-        applyPose('Relax', preloadedVrm);
+        applyPose('Pose1', preloadedVrm);
         scene.add(preloadedVrm.scene);
       } else {
         // === VRM ローダー ===
@@ -84,10 +101,10 @@ const AvatarViewer = ({ vrmUrl, preloadedVrm }) => {
               return;
             }
             vrmRef.current = vrm;
-            vrm.scene.scale.set(1.5, 1.5, 1.5);
-            vrm.scene.position.set(0, -2.0, 0);
+            vrm.scene.scale.set(modelScale, modelScale, modelScale);
+            vrm.scene.position.set(0, modelYOffset, 0);
             vrm.scene.rotation.y = Math.PI;
-            applyPose('Relax', vrm);
+            applyPose('Pose1', vrm);
             scene.add(vrm.scene);
           },
           undefined,
@@ -153,111 +170,73 @@ const AvatarViewer = ({ vrmUrl, preloadedVrm }) => {
   useEffect(() => {
     if (!vrmRef.current) return;
     applyPose(pose, vrmRef.current);
-    if (pose === 'Cheer') {
-      textToSpeech(`がんばって`); // 音声合成関数を呼び出す
-    } else if (pose === 'Relax') {
-      textToSpeech(`いいかんじ`); // 音声合成関数を呼び出す
+    // poseごとにjsonで発言内容を指定
+    const speech = poseSpeech[pose];
+    if (speech) {
+      textToSpeech(speech, trainerInfo.speaker);
     }
   }, [pose]);
 
   // -------------------------------------------------------
-  // applyPose 関数：'Relax' / 'Cheer' を VRM に適用する
+  // applyPose 関数：'Relax' / 'Cheer' を VRM に適用する（trainerごとに）
   // -------------------------------------------------------
   const applyPose = (whichPose, vrm) => {
     if (!vrm.humanoid) return;
 
-    // 左右の上腕・前腕の BoneNode を取得
-    const leftUpperArm   = vrm.humanoid.getBoneNode('leftUpperArm');
-    const rightUpperArm  = vrm.humanoid.getBoneNode('rightUpperArm');
-    const leftLowerArm   = vrm.humanoid.getBoneNode('leftLowerArm');
-    const rightLowerArm  = vrm.humanoid.getBoneNode('rightLowerArm');
-
-    // まずはすべての回転をリセット（Tポーズ由来の回転をクリア）
-    if (leftUpperArm)   leftUpperArm.rotation.set(0, 0, 0);
-    if (rightUpperArm)  rightUpperArm.rotation.set(0, 0, 0);
-    if (leftLowerArm)   leftLowerArm.rotation.set(0, 0, 0);
-    if (rightLowerArm)  rightLowerArm.rotation.set(0, 0, 0);
-
-    // 指のボーンを取得（右手用）
-    const rightThumbProximal     = vrm.humanoid.getBoneNode('rightThumbProximal');
-    const rightThumbIntermediate = vrm.humanoid.getBoneNode('rightThumbIntermediate');
-    const rightThumbDistal       = vrm.humanoid.getBoneNode('rightThumbDistal');
-    const rightIndexProximal     = vrm.humanoid.getBoneNode('rightIndexProximal');
-    const rightIndexIntermediate = vrm.humanoid.getBoneNode('rightIndexIntermediate');
-    const rightIndexDistal       = vrm.humanoid.getBoneNode('rightIndexDistal');
-    const rightMiddleProximal    = vrm.humanoid.getBoneNode('rightMiddleProximal');
-    const rightMiddleIntermediate= vrm.humanoid.getBoneNode('rightMiddleIntermediate');
-    const rightMiddleDistal      = vrm.humanoid.getBoneNode('rightMiddleDistal');
-    const rightRingProximal      = vrm.humanoid.getBoneNode('rightRingProximal');
-    const rightRingIntermediate  = vrm.humanoid.getBoneNode('rightRingIntermediate');
-    const rightRingDistal        = vrm.humanoid.getBoneNode('rightRingDistal');
-    const rightLittleProximal    = vrm.humanoid.getBoneNode('rightLittleProximal');
-    const rightLittleIntermediate= vrm.humanoid.getBoneNode('rightLittleIntermediate');
-    const rightLittleDistal      = vrm.humanoid.getBoneNode('rightLittleDistal');
-
-    // ------------ Relax ポーズ ------------
-    if (whichPose === 'Relax') {
-      // 左右両腕を体の横に自然に垂らす
-      if (leftUpperArm)   leftUpperArm.rotation.set(0, 0,  Math.PI / 2);
-      if (rightUpperArm)  rightUpperArm.rotation.set(0, 0, -Math.PI / 2);
-
-      // 前腕を軽く曲げる
-      if (leftLowerArm)   leftLowerArm.rotation.set(-Math.PI / 8, 0, 0);
-      if (rightLowerArm)  rightLowerArm.rotation.set(-Math.PI / 8, 0, 0);
-
-      // 指の回転リセット（握っていない状態）
-      if (rightThumbProximal)      rightThumbProximal.rotation.set(0, 0, 0);
-      if (rightThumbIntermediate)  rightThumbIntermediate.rotation.set(0, 0, 0);
-      if (rightThumbDistal)        rightThumbDistal.rotation.set(0, 0, 0);
-      if (rightIndexProximal)      rightIndexProximal.rotation.set(0, 0, 0);
-      if (rightIndexIntermediate)  rightIndexIntermediate.rotation.set(0, 0, 0);
-      if (rightIndexDistal)        rightIndexDistal.rotation.set(0, 0, 0);
-      if (rightMiddleProximal)     rightMiddleProximal.rotation.set(0, 0, 0);
-      if (rightMiddleIntermediate) rightMiddleIntermediate.rotation.set(0, 0, 0);
-      if (rightMiddleDistal)       rightMiddleDistal.rotation.set(0, 0, 0);
-      if (rightRingProximal)       rightRingProximal.rotation.set(0, 0, 0);
-      if (rightRingIntermediate)   rightRingIntermediate.rotation.set(0, 0, 0);
-      if (rightRingDistal)         rightRingDistal.rotation.set(0, 0, 0);
-      if (rightLittleProximal)     rightLittleProximal.rotation.set(0, 0, 0);
-      if (rightLittleIntermediate) rightLittleIntermediate.rotation.set(0, 0, 0);
-      if (rightLittleDistal)       rightLittleDistal.rotation.set(0, 0, 0);
-
-      return;
+    // --- 表情リセット＆切り替え ---
+    if (vrm.expressionManager && vrm.expressionManager.setValue) {
+      // VRM 0.x/1.x両対応: プリセット表情名リスト
+      const expressions = ['neutral', 'smile', 'fun', 'angry', 'sorrow'];
+      expressions.forEach(name => vrm.expressionManager.setValue(name, 0));
+      const poseData = poseConfig[whichPose] || {};
+      if (poseData.expression && expressions.includes(poseData.expression)) {
+        vrm.expressionManager.setValue(poseData.expression, 1.0);
+      }
     }
 
-    // ------------ Cheer（頑張れ）ポーズ ------------
-    if (whichPose === 'Cheer') {
-      // 右腕を上げる
-      if (rightUpperArm)  rightUpperArm.rotation.set(-1, 2.2, 1.8);
-      if (rightLowerArm)  rightLowerArm.rotation.set(1, 0, 0);
+    // ボーン名リスト
+    const boneNames = [
+      // 体幹・首・頭
+      'hips', 'spine', 'chest', 'upperChest', 'neck', 'head',
+      // 腕・手首・指
+      'leftUpperArm', 'rightUpperArm', 'leftLowerArm', 'rightLowerArm',
+      'leftHand', 'rightHand',
+      // 脚
+      'leftUpperLeg', 'rightUpperLeg', 'leftLowerLeg', 'rightLowerLeg',
+      // 指
+      'rightThumbProximal', 'rightThumbIntermediate', 'rightThumbDistal',
+      'rightIndexProximal', 'rightIndexIntermediate', 'rightIndexDistal',
+      'rightMiddleProximal', 'rightMiddleIntermediate', 'rightMiddleDistal',
+      'rightRingProximal', 'rightRingIntermediate', 'rightRingDistal',
+      'rightLittleProximal', 'rightLittleIntermediate', 'rightLittleDistal',
+      'leftThumbProximal', 'leftThumbIntermediate', 'leftThumbDistal',
+      'leftIndexProximal', 'leftIndexIntermediate', 'leftIndexDistal',
+      'leftMiddleProximal', 'leftMiddleIntermediate', 'leftMiddleDistal',
+      'leftRingProximal', 'leftRingIntermediate', 'leftRingDistal',
+      'leftLittleProximal', 'leftLittleIntermediate', 'leftLittleDistal'
+    ];
 
-      // 左腕はRelaxと同じ：体の横に自然に垂らす
-      if (leftUpperArm)   leftUpperArm.rotation.set(0, 0,  Math.PI / 2);
-      if (leftLowerArm)   leftLowerArm.rotation.set(-Math.PI / 8, 0, 0);
+    // まずはすべての回転をリセット
+    boneNames.forEach(boneName => {
+      const bone = vrm.humanoid.getBoneNode(boneName);
+      if (bone) bone.rotation.set(0, 0, 0);
+    });
 
-      // 右手をグー（拳）にするため、指を内側に曲げる
-      // 親指
-      if (rightThumbProximal)      rightThumbProximal.rotation.set(0,  1.5,   0);
-      if (rightThumbIntermediate)  rightThumbIntermediate.rotation.set(1,  1.0,   1);
-      if (rightThumbDistal)        rightThumbDistal.rotation.set(0,  1.0,   0);
-      // 人差し指
-      if (rightIndexProximal)      rightIndexProximal.rotation.set(-1.5, 1.5, 0);
-      if (rightIndexIntermediate)  rightIndexIntermediate.rotation.set(-.5, 1.5, 0);
-      if (rightIndexDistal)        rightIndexDistal.rotation.set(-1.5, 0, 0);
-      // 中指
-      if (rightMiddleProximal)     rightMiddleProximal.rotation.set(-1.5, 1.5, 0);
-      if (rightMiddleIntermediate) rightMiddleIntermediate.rotation.set(-1.5, 1.5, 0);
-      if (rightMiddleDistal)       rightMiddleDistal.rotation.set(-1.5, 0, 0);
-      // 薬指
-      if (rightRingProximal)       rightRingProximal.rotation.set(-1.5, 1.5, 0);
-      if (rightRingIntermediate)   rightRingIntermediate.rotation.set(-1.5, 1.5, 0);
-      if (rightRingDistal)         rightRingDistal.rotation.set(-1.5, 0, 0);
-      // 小指
-      if (rightLittleProximal)     rightLittleProximal.rotation.set(-1.5, 1.5, 0);
-      if (rightLittleIntermediate) rightLittleIntermediate.rotation.set(-1.5, 1.5, 0);
-      if (rightLittleDistal)       rightLittleDistal.rotation.set(-1.5, 0, 0);
+    // trainer.json の pose 設定
+    const poseData = poseConfig[whichPose] || {};
+    boneNames.forEach(boneName => {
+      if (poseData[boneName]) {
+        const bone = vrm.humanoid.getBoneNode(boneName);
+        if (bone) bone.rotation.set(...poseData[boneName]);
+      }
+    });
 
-      return;
+    // デフォルトの追加動作（Relax時の前腕・指リセットなど）
+    if (whichPose === 'Pose1') {
+      const leftLowerArm = vrm.humanoid.getBoneNode('leftLowerArm');
+      const rightLowerArm = vrm.humanoid.getBoneNode('rightLowerArm');
+      if (leftLowerArm && !poseData.leftLowerArm) leftLowerArm.rotation.set(-Math.PI / 8, 0, 0);
+      if (rightLowerArm && !poseData.rightLowerArm) rightLowerArm.rotation.set(-Math.PI / 8, 0, 0);
     }
   };
 
@@ -269,7 +248,7 @@ const AvatarViewer = ({ vrmUrl, preloadedVrm }) => {
       />
       {/* ポーズ切替ボタン */}
       <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)' }}>
-        {['Relax', 'Cheer'].map((key) => (
+        {poseNames.map((key) => (
           <button
             key={key}
             onClick={() => setPose(key)}

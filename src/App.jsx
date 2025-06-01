@@ -5,6 +5,7 @@ import Camera from './Camera';
 import AvatarViewer from './AvatarViewer';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { VRMLoaderPlugin } from '@pixiv/three-vrm';
+import { textToSpeech } from './utils/voicevox';
 
 function App() {
   const [started, setStarted] = useState(false);
@@ -24,29 +25,40 @@ function App() {
         err => console.error(`${key} load error:`, err)
       );
     };
-    loadModel('/avatars/avatar.vrm', 'A');
+    loadModel('/avatars/2167204924210077347.vrm', 'C');
     loadModel('/avatars/sport_girl.vrm', 'B');
   }, []);
+
+  useEffect(() => {
+    if (evaluation) {
+      textToSpeech(evaluation);
+    }
+  }, [evaluation]);
 
   if (!started) {
     return (
       <div className="titleScreen">
-        <h1 className="titleScreen__heading">フィットネストレーナーアプリ</h1><br />
+        <div className="titleScreen__overlay" />
+        <h1 className="titleScreen__heading">Overfitness Trainer</h1>
         <div className="titleScreen__controls">
           <div className="titleScreen__selectBox">
-            <label htmlFor="trainer-select" className="titleScreen__label">トレーナーを選択:</label>
+            <label htmlFor="trainer-select" className="titleScreen__label">
+              トレーナーを選択:
+            </label>
             <select
               id="trainer-select"
               value={trainer}
               onChange={e => setTrainer(e.target.value)}
               className="titleScreen__select"
             >
-              <option value="A">トレーナー A</option>
+              <option value="C">トレーナー C</option>
               <option value="B">トレーナー B</option>
             </select>
           </div>
           <div className="titleScreen__selectBox">
-            <label htmlFor="menu-select" className="titleScreen__label">トレーニングメニュー:</label>
+            <label htmlFor="menu-select" className="titleScreen__label">
+              トレーニングメニュー:
+            </label>
             <select
               id="menu-select"
               value={menu}
@@ -88,7 +100,11 @@ function App() {
           <h2 className="panelTitle">Trainer</h2>
           <div className="panelContent" style={{ position: 'relative' }}>
             <AvatarViewer
-              vrmUrl={trainer === 'A' ? '/avatars/avatar.vrm' : '/avatars/sport_girl.vrm'}
+              vrmUrl={
+                trainer === 'C'
+                  ? '/avatars/2167204924210077347.vrm'
+                  : '/avatars/sport_girl.vrm'
+              }
               preloadedVrm={models[trainer]}
             />
             {evaluation && (

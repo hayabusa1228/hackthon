@@ -50,7 +50,7 @@ const Camera = ({ onEvaluation }) => {
           console.error('Upload failed:', e);
         }
       })();
-    }, 5000);
+    }, 10000);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);

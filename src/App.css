@@ -192,140 +192,183 @@ body,
   }
 }
 
-/* ── 追加: タイトル画面全体のスタイリング（シンプル版） ── */
+/* ── 追加: タイトル画面全体のスタイリング（華やか版） ── */
 .titleScreen {
-  /* ビューポート全体を使う */
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  /* 背景画像＋グラデーション */
+  background:
+    linear-gradient(to bottom right, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
+    url('/images/fitness-bg.jpg') center/cover no-repeat;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
-  /* シンプルな淡いグレー背景 */
-  background-color: #f5f5f5;
-  color: #333333;
-  text-align: center;
-  padding: 0 16px; /* モバイル時に余白を確保 */
-  box-sizing: border-box;
+  overflow: hidden;
 }
 
-/* 見出し */
+.titleScreen__overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  /* 背景を少し暗めにして文字を浮き立たせる */
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 1;
+}
+
 .titleScreen__heading {
-  font-size: 2.5rem;
+  position: relative;
+  z-index: 2;
+  font-size: 3rem;
+  color: #ffe600;
+  /* イエロー系で目立たせる */
+  font-weight: 800;
+  letter-spacing: 2px;
   margin-bottom: 2rem;
-  /* テキストシャドウを外して、シンプルにダークグレー */
-  color: #333333;
-  margin: 0;
+  animation: fadeInDown 1s ease-out;
+  text-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
 }
 
-/* セレクト周りをまとめるコンテナ */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .titleScreen__controls {
+  position: relative;
+  z-index: 2;
   display: flex;
-  flex-wrap: wrap;
-  gap: 1rem; /* セレクト同士の余白 */
+  gap: 1.5rem;
   margin-bottom: 2rem;
+  animation: fadeIn 1.5s ease-in-out 0.5s forwards;
+  opacity: 0;
 }
 
-/* 各セレクトボックス＋ラベルをまとめる */
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
 .titleScreen__selectBox {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
 }
 
-/* ラベル */
 .titleScreen__label {
+  color: #fff;
   font-size: 1rem;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: #333333;
+  margin-bottom: 0.4rem;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
-/* セレクト要素 */
 .titleScreen__select {
-  appearance: none; /* ブラウザデフォルトの矢印を消す */
-  background-color: #ffffff;
-  color: #333333;
-  border: 1px solid #cccccc;
-  border-radius: 4px;
-  padding: 0.5rem 0.75rem;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: border-color 0.15s ease;
-}
-
-/* セレクトにホバー・フォーカス時の境界線色変化 */
-.titleScreen__select:hover,
-.titleScreen__select:focus {
-  border-color: #999999;
-  outline: none;
-}
-
-/* 開始ボタン */
-.titleScreen__startButton {
-  background-color: #333333;
-  color: #ffffff;
+  width: 180px;
+  padding: 0.6rem 1rem;
   border: none;
-  border-radius: 6px;
-  padding: 0.75rem 2rem;
-  font-size: 1.25rem;
-  font-weight: bold;
+  border-radius: 30px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+  background: #fff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+
+.titleScreen__select:hover {
+  transform: scale(1.05);
+}
+
+.titleScreen__startButton {
+  position: relative;
+  z-index: 2;
+  padding: 0.8rem 2.5rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(45deg, #ff416c, #ff4b2b);
+  border: none;
+  border-radius: 50px;
   cursor: pointer;
-  transition: background-color 0.15s ease, transform 0.1s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  transition: box-shadow 0.3s, transform 0.3s;
+  animation: pulseButton 1.5s infinite ease-in-out;
 }
 
-/* ボタンのホバー時 */
 .titleScreen__startButton:hover {
-  background-color: #4d4d4d;
+  transform: scale(1.05);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
 }
 
-/* ボタンのアクティブ（クリック時） */
-.titleScreen__startButton:active {
-  transform: scale(0.97);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+@keyframes pulseButton {
+
+  0%,
+  100% {
+    box-shadow: 0 6px 20px rgba(255, 75, 43, 0.6), 0 0 0 0 rgba(255, 75, 43, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 6px 20px rgba(255, 75, 43, 0.6), 0 0 0 20px rgba(255, 75, 43, 0);
+  }
 }
 
 /* ── レスポンシブ対応 ── */
-@media (max-width: 768px) {
+@media screen and (max-width: 768px) {
   .titleScreen__heading {
-    font-size: 2rem;
+    font-size: 2.2rem;
     margin-bottom: 1.5rem;
   }
+
   .titleScreen__controls {
     gap: 0.75rem;
     margin-bottom: 1.5rem;
   }
+
   .titleScreen__select {
-    font-size: 0.9rem;
-    padding: 0.4rem 0.6rem;
+    width: 140px;
   }
+
   .titleScreen__startButton {
-    font-size: 1.1rem;
-    padding: 0.6rem 1.5rem;
+    font-size: 1rem;
+    padding: 0.6rem 2rem;
   }
 }
 
-@media (max-width: 480px) {
+@media screen and (max-width: 480px) {
   .titleScreen__heading {
     font-size: 1.75rem;
     margin-bottom: 1rem;
   }
+
   .titleScreen__controls {
     flex-direction: column;
-    align-items: stretch;
+    align-items: center;
     gap: 0.75rem;
     margin-bottom: 1rem;
   }
+
   .titleScreen__selectBox {
     width: 100%;
   }
+
   .titleScreen__select {
     width: 100%;
   }
+
   .titleScreen__startButton {
     width: 100%;
     font-size: 1rem;
     padding: 0.5rem 1rem;
   }
 }
-
