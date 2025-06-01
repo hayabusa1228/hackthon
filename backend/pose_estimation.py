@@ -28,6 +28,7 @@ def pose_estimation(image):
         results = pose.process(image_rgb)
 
         if not results.pose_landmarks:
+            return None, None  #画像は後回し
             raise ValueError("プランクの姿勢になって体全体を映してください")
 
         landmarks = results.pose_landmarks.landmark
@@ -53,11 +54,11 @@ def pose_estimation(image):
 
         # 出力用データ
         pose_info = {
-            "right_knee_angle": "N/A",
-            "left_knee_angle": "N/A",
+            # "right_knee_angle": "N/A",
+            # "left_knee_angle": "N/A",
             "right_hip_angle": f"{hip_angle:.2f}",
             "left_hip_angle": f"{hip_angle:.2f}",
-            "torso_tilt": "N/A",
+            # "torso_tilt": "N/A",
             "shoulder_hip_ankle_alignment": hip_eval
         }
 

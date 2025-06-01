@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>単一フレーム送信テスト</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; line-height: 1.6; }
+        video {
+            border: 1px solid black;
+            transform: scaleX(-1); /* Webカメラ映像を鏡映しで表示 */
+            background-color: #333;
+            margin-bottom: 10px;
+        }
+        canvas {
+            display: none; /* フレームキャプチャ用なので非表示 */
+        }
+        .controls { margin-top: 10px; margin-bottom: 10px; }
+        .controls label { margin-right: 5px; }
+        .controls input[type="text"] { width: 400px; margin-right: 10px; padding: 5px; }
+        .controls button { padding: 8px 15px; margin-right: 10px; }
+        #status { font-weight: bold; }
+        #responseArea { margin-top:10px; padding:10px; border:1px solid #eee; background-color:#f5f5f5; min-height: 50px; white-space: pre-wrap;}
+    </style>
+</head>
+<body>
+    <h1>単一フレーム送信テスト</h1>
+
+    <video id="webcam" width="640" height="480" autoplay playsinline muted></video>
+    <canvas id="captureCanvas"></canvas>
+
+    <div class="controls">
+        <label for="backendUrl">バックエンドURL:</label>
+        <input type="text" id="backendUrl" value="http://127.0.0.1:3001/api/post_image">
+        <p style="font-size: 0.8em; color: grey;">例: http://localhost:8000/api/process_frame</p>
+    </div>
+
+    <div class="controls">
+        <button id="startWebcamButton">Webカメラ開始</button>
+        <button id="captureSendButton" disabled>画像キャプチャして送信</button>
+        <button id="stopWebcamButton" disabled>Webカメラ停止</button>
+    </div>
+
+    <p>ステータス: <span id="status">待機中</span></p>
+    <p>バックエンドからの応答:</p>
+    <div id="responseArea">ここにバックエンドからの応答が表示されます。</div>
+
+    <script>
+        const videoElement = document.getElementById('webcam');
+        const canvasElement = document.getElementById('captureCanvas');
+        const ctx = canvasElement.getContext('2d', { willReadFrequently: true });
+        const startWebcamButton = document.getElementById('startWebcamButton');
+        const captureSendButton = document.getElementById('captureSendButton');
+        const stopWebcamButton = document.getElementById('stopWebcamButton');
+        const statusSpan = document.getElementById('status');
+        const backendUrlInput = document.getElementById('backendUrl');
+        const responseArea = document.getElementById('responseArea');
+
+        // --- 設定値 ---
+        const CAPTURE_WIDTH = 320;  // 送信する画像の幅
+        const CAPTURE_HEIGHT = 240; // 送信する画像の高さ
+        const IMAGE_FORMAT = 'image/webp'; // 'image/jpeg' も可
+        const IMAGE_QUALITY = 0.8;   // 0.0 (低品質/高圧縮) から 1.0 (高品質/低圧縮)
+        // --- ---
+
+        let mediaStream = null;
+
+        async function startWebcam() {
+            if (mediaStream) return; // 既に開始している場合は何もしない
+
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    },
+                    audio: false
+                });
+                videoElement.srcObject = mediaStream;
+                await new Promise(resolve => videoElement.onloadedmetadata = resolve);
+                videoElement.play();
+
+                statusSpan.textContent = 'カメラ起動中。キャプチャ可能です。';
+                startWebcamButton.disabled = true;
+                captureSendButton.disabled = false;
+                stopWebcamButton.disabled = false;
+                backendUrlInput.disabled = true;
+
+            } catch (err) {
+                console.error('Error accessing webcam:', err);
+                statusSpan.textContent = `カメラエラー: ${err.message}`;
+                responseArea.textContent = `カメラへのアクセスに失敗しました。許可を確認してください。`;
+            }
+        }
+
+        function stopWebcam() {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+                mediaStream = null;
+            }
+            statusSpan.textContent = 'カメラ停止中。';
+            startWebcamButton.disabled = false;
+            captureSendButton.disabled = true;
+            stopWebcamButton.disabled = true;
+            backendUrlInput.disabled = false;
+        }
+
+        async function captureAndSendFrame() {
+            const backendUrl = backendUrlInput.value.trim();
+            if (!backendUrl) {
+                alert('バックエンドURLを入力してください。');
+                return;
+            }
+            if (!mediaStream || videoElement.paused || videoElement.ended || videoElement.readyState < videoElement.HAVE_CURRENT_DATA) {
+                alert('Webカメラが開始されていないか、映像が準備できていません。');
+                return;
+            }
+
+            statusSpan.textContent = 'フレームをキャプチャ・送信中...';
+            captureSendButton.disabled = true; // 送信中はボタンを無効化
+
+            // Canvasのサイズをキャプチャ解像度に設定
+            canvasElement.width = CAPTURE_WIDTH;
+            canvasElement.height = CAPTURE_HEIGHT;
+
+            // ビデオフレームをCanvasに描画 (リサイズ)
+            ctx.drawImage(videoElement, 0, 0, CAPTURE_WIDTH, CAPTURE_HEIGHT);
+
+            // Canvasの内容をBlobとして取得
+            canvasElement.toBlob(async (blob) => {
+                if (!blob) {
+                    console.error('Failed to create blob from canvas.');
+                    statusSpan.textContent = '画像データの作成に失敗しました。';
+                    captureSendButton.disabled = false;
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('image', blob, `capture-${Date.now()}.webp`);
+
+                try {
+                    const response = await fetch(backendUrl, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const responseData = await response.json();
+
+                    if (response.ok) {
+                        console.log('Backend response:', responseData);
+                        responseArea.textContent = JSON.stringify(responseData, null, 2);
+                        statusSpan.textContent = '送信完了。応答受信。';
+                    } else {
+                        console.error('Backend error:', response.status, responseData);
+                        responseArea.textContent = `バックエンドエラー: ${response.status}\n${JSON.stringify(responseData, null, 2)}`;
+                        statusSpan.textContent = 'バックエンドエラー発生。';
+                    }
+                } catch (error) {
+                    console.error('Error sending frame or parsing response:', error);
+                    responseArea.textContent = `送信エラー: ${error.message}`;
+                    statusSpan.textContent = '送信エラー発生。';
+                } finally {
+                    captureSendButton.disabled = false; // ボタンを再度有効化
+                }
+            }, IMAGE_FORMAT, IMAGE_QUALITY);
+        }
+
+        startWebcamButton.addEventListener('click', startWebcam);
+        stopWebcamButton.addEventListener('click', stopWebcam);
+        captureSendButton.addEventListener('click', captureAndSendFrame);
+
+        // 初期状態
+        statusSpan.textContent = '待機中。Webカメラを開始してください。';
+
+    </script>
+</body>
+</html>

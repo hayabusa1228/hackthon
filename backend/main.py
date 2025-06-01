@@ -39,6 +39,11 @@ async def post_image(image: UploadFile = File(...)):
         pose_info, overlay_image_base64 = ps.pose_estimation(img_cv)
 
         # Gemini用プロンプト作成
+
+        if pose_info is None:
+            return "AAAa"
+            raise HTTPException(status_code=400, detail="プランクの姿勢になって体全体を映してください")
+        
         processed_data = text_processing(pose_info)
         generated_text = await generate_text(processed_data)
 
@@ -49,6 +54,8 @@ async def post_image(image: UploadFile = File(...)):
         }
         
     except Exception as e:
+        import traceback
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
     
 def text_processing(pose_info):
@@ -64,11 +71,8 @@ def text_processing(pose_info):
 
 例:
 * **主要な関節角度 (度):**
-    * 右膝の角度: {pose_info['right_knee_angle']}
-    * 左膝の角度: {pose_info['left_knee_angle']}
     * 右股関節の角度（大腿骨と胴体のなす角度）: {pose_info['right_hip_angle']}
     * 左股関節の角度（大腿骨と胴体のなす角度）: {pose_info['left_hip_angle']}
-    * 体幹の傾き（垂直に対する前傾角度）: {pose_info['torso_tilt']}
     * 肩と腰と足首の位置関係（側面から見て一直線に近いか）: {pose_info['shoulder_hip_ankle_alignment']}
 
 ## 3. [対象エクササイズ名] の正しい姿勢のポイント:
