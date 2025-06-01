@@ -8,8 +8,8 @@ import base64
 
 # 日本語フォントの指定（Windows例、環境に応じて変更可能）
 # font_path = "C:/Windows/Fonts/msgothic.ttc"
-font_path = "/Library/Fonts/Arial Unicode.ttf"  # macOSの例
-font = ImageFont.truetype(font_path, 30)
+# font_path = "/Library/Fonts/Arial Unicode.ttf"  # macOSの例
+# font = ImageFont.truetype(font_path, 30)
 
 # MediaPipe
 mp_drawing = mp.solutions.drawing_utils
@@ -88,19 +88,20 @@ def pose_estimation(image):
         }
 
         # 画像オーバーレイ処理
-        image_pil = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-        draw = ImageDraw.Draw(image_pil)
-        draw.text((10, 50), f"左膝角度: {int(left_knee_angle)}度", font=font, fill=color)
-        draw.text((10, 100), f"右膝角度: {int(right_knee_angle)}度", font=font, fill=color)
-        draw.text((10, 150), f"体幹傾き: {int(torso_tilt)}度", font=font, fill=color)
-        draw.text((10, 200), f"{hip_eval}", font=font, fill=color)
+        # image_pil = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        # draw = ImageDraw.Draw(image_pil)
+        # draw.text((10, 50), f"左膝角度: {int(left_knee_angle)}度", font=font, fill=color)
+        # draw.text((10, 100), f"右膝角度: {int(right_knee_angle)}度", font=font, fill=color)
+        # draw.text((10, 150), f"体幹傾き: {int(torso_tilt)}度", font=font, fill=color)
+        # draw.text((10, 200), f"{hip_eval}", font=font, fill=color)
 
-        # 骨格描画
-        mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+        # # 骨格描画
+        # mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
-        # PIL → OpenCV → JPEG → Base64
-        image_bgr = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
-        _, buffer = cv2.imencode('.jpg', image_bgr)
-        jpg_as_text = base64.b64encode(buffer).decode("utf-8")
+        # # PIL → OpenCV → JPEG → Base64
+        # image_bgr = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
+        # _, buffer = cv2.imencode('.jpg', image_bgr)
+        # jpg_as_text = base64.b64encode(buffer).decode("utf-8")
 
-        return pose_info, jpg_as_text
+        # return pose_info, jpg_as_text
+        return pose_info, None

@@ -7,18 +7,19 @@ import numpy as np
 
 import vertexai
 from vertexai.generative_models import GenerativeModel, Part
+import os
 
 # ─── Vertex AI の初期化（一度だけ） ───
 vertexai.init(
-    project="overfit-461602",
+    project=os.environ.get("GOOGLE_CLOUD_PROJECT"),
     location="asia-northeast1"
 )
 
 # Pose Estimation モジュールの読み込み
-from backend import pose_estimation as ps
+import pose_estimation as ps
 
 # “chat.py” の router をインポートする
-from backend.chat import router as chat_router
+from chat import router as chat_router
 
 app = FastAPI()
 
@@ -28,7 +29,8 @@ origins = [
     "http://localhost:5173",
     "http://localhost:3000",
     "http://127.0.0.1:5173",
-    "http://127.0.0.1:3000"
+    "http://127.0.0.1:3000",
+    "https://overfit-461505.an.r.appspot.com"
 ]
 app.add_middleware(
     CORSMiddleware,

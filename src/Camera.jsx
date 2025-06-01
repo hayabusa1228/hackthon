@@ -39,7 +39,8 @@ const Camera = ({ onEvaluation }) => {
         form.append('image', blob, 'frame.png');
 
         try {
-          const res = await fetch('http://127.0.0.1:8000/api/post_image', {
+          // const res = await fetch('http://127.0.0.1:8000/api/post_image', {
+          const res = await fetch('https://overfit-739041781905.asia-northeast1.run.app/api/post_image', {
             method: 'POST',
             body: form,
           });
