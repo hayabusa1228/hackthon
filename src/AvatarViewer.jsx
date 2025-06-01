@@ -7,7 +7,7 @@ import { VRMLoaderPlugin } from '@pixiv/three-vrm';
 import { textToSpeech } from './utils/voicevox';
 
 // trainerId を受け取る形に拡張
-const AvatarViewer = ({ vrmUrl, preloadedVrm, trainerId }) => {
+const AvatarViewer = ({ vrmUrl, preloadedVrm, trainerId, pose: externalPose }) => {
   const mountRef = useRef(null);
   const rendererRef = useRef(null);
   const sceneRef = useRef(null);
@@ -16,7 +16,13 @@ const AvatarViewer = ({ vrmUrl, preloadedVrm, trainerId }) => {
   const vrmRef = useRef(null);
 
   // 選択中ポーズ名
-  const [pose, setPose] = useState('Pose1');
+  const [pose, setPose] = useState(externalPose || 'Pose1');
+  // 外部からposeが変わったら反映
+  useEffect(() => {
+    if (externalPose && externalPose !== pose) {
+      setPose(externalPose);
+    }
+  }, [externalPose]);
 
   // トレーナー情報取得
   const trainerInfo = trainersJson.find(t => t.vrmUrl === vrmUrl || t.id === trainerId) || {};
@@ -170,11 +176,6 @@ const AvatarViewer = ({ vrmUrl, preloadedVrm, trainerId }) => {
   useEffect(() => {
     if (!vrmRef.current) return;
     applyPose(pose, vrmRef.current);
-    // poseごとにjsonで発言内容を指定
-    const speech = poseSpeech[pose];
-    if (speech) {
-      textToSpeech(speech, trainerInfo.speaker);
-    }
   }, [pose]);
 
   // -------------------------------------------------------
@@ -246,26 +247,7 @@ const AvatarViewer = ({ vrmUrl, preloadedVrm, trainerId }) => {
         ref={mountRef}
         style={{ width: '100%', height: '100%', position: 'relative' }}
       />
-      {/* ポーズ切替ボタン */}
-      <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)' }}>
-        {poseNames.map((key) => (
-          <button
-            key={key}
-            onClick={() => setPose(key)}
-            style={{
-              margin: '0 6px',
-              padding: '6px 12px',
-              backgroundColor: pose === key ? '#4CAF50' : '#eee',
-              color: pose === key ? '#fff' : '#333',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            {key}
-          </button>
-        ))}
-      </div>
+      {/* ポーズ切替ボタン削除済み */}
     </div>
   );
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import trainersData from './trainers.json';
 import './App.css';
 import Header from './Header';
 import Camera from './Camera';
@@ -11,8 +12,14 @@ function App() {
   const [started, setStarted] = useState(false);
   const [trainer, setTrainer] = useState('A');
   const [menu, setMenu] = useState('menu1');
-  const [models, setModels] = useState({ A: null, B: null });
+  const [trainers] = useState(trainersData);
+  const [models, setModels] = useState(() => {
+    const obj = {};
+    trainersData.forEach(t => { obj[t.id] = null; });
+    return obj;
+  });
   const [evaluation, setEvaluation] = useState('');
+  const [pose, setPose] = useState('Pose1');
 
   useEffect(() => {
     const loader = new GLTFLoader();
@@ -25,15 +32,24 @@ function App() {
         err => console.error(`${key} load error:`, err)
       );
     };
-    loadModel('/avatars/2167204924210077347.vrm', 'C');
-    loadModel('/avatars/sport_girl.vrm', 'B');
-  }, []);
+    trainers.forEach(trainer => {
+      loadModel(trainer.vrmUrl, trainer.id);
+    });
+  }, [trainers]);
 
   useEffect(() => {
     if (evaluation) {
-      textToSpeech(evaluation);
+      // ランダムなポーズ名を選択
+      const trainerInfo = trainers.find(t => t.id === trainer);
+      const poseNames = trainerInfo && trainerInfo.poses ? Object.keys(trainerInfo.poses) : ['Pose1'];
+      if (poseNames.length > 0) {
+        const randomPose = poseNames[Math.floor(Math.random() * poseNames.length)];
+        setPose(randomPose);
+      }
+      const speaker = trainerInfo && trainerInfo.speaker ? trainerInfo.speaker : 10;
+      textToSpeech(evaluation, speaker);
     }
-  }, [evaluation]);
+  }, [evaluation, trainer, trainers]);
 
   if (!started) {
     return (
@@ -51,8 +67,9 @@ function App() {
               onChange={e => setTrainer(e.target.value)}
               className="titleScreen__select"
             >
-              <option value="C">トレーナー C</option>
-              <option value="B">トレーナー B</option>
+              {trainers.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
             </select>
           </div>
           <div className="titleScreen__selectBox">
@@ -99,14 +116,15 @@ function App() {
         <div className="panel trainerPanel">
           <h2 className="panelTitle">Trainer</h2>
           <div className="panelContent" style={{ position: 'relative' }}>
-            <AvatarViewer
-              vrmUrl={
-                trainer === 'C'
-                  ? '/avatars/2167204924210077347.vrm'
-                  : '/avatars/sport_girl.vrm'
-              }
-              preloadedVrm={models[trainer]}
-            />
+            {models[trainer] ? (
+              <AvatarViewer
+                vrmUrl={trainers.find(t => t.id === trainer)?.vrmUrl}
+                preloadedVrm={models[trainer]}
+                pose={pose}
+              />
+            ) : (
+              <div style={{ textAlign: 'center', padding: '2em', color: '#fff' }}>Loading...</div>
+            )}
             {evaluation && (
               <div
                 style={{
